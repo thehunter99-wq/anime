@@ -1,23 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 const NATIVE_SCRIPT_URL =
   process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL ??
   'https://pl31577360.profitableratecpmnetwork.com/ebab695606cac21b468c0fe20067b7f6/invoke.js';
 
-/**
- * Adsterra Native Banner.
- *
- * The network script writes directly into the container div, so it is injected
- * via useEffect rather than next/script. A plain <Script> would run before the
- * div exists on first paint, and a client-side re-render would wipe whatever the
- * script injected — appending imperatively avoids both problems.
- */
-
 const CONTAINER_ID = 'container-ebab695606cac21b468c0fe20067b7f6';
 
-const SCRIPT_TAG_ID = 'adsterra-native-banner-script';
+/** Distinguishes successive injections so no script tag is ever removed. */
+let injectionCount = 0;
 
 type NativeBannerProps = {
   className?: string;
@@ -29,69 +21,70 @@ type NativeBannerProps = {
 /**
  * Adsterra Native Banner.
  *
- * The network script writes directly into the container div, so it is injected
- * via useEffect rather than next/script. A plain <Script> would run before the
- * div exists on first paint, and a client-side re-render would wipe whatever the
- * script injected — appending imperatively avoids both problems.
+ * Isolated client component: the banner div is rendered empty and the network
+ * script is attached imperatively only after that div is confirmed to be in the
+ * document, which keeps it out of React's hydration path entirely.
+ *
+ * Two rules below are what actually stop the runtime errors:
+ *
+ *  1. Never clear the container. The script holds live references to the nodes
+ *     it inserted; detaching them (via `innerHTML = ''`) makes it throw
+ *     "Cannot read properties of null (reading 'parentNode')".
+ *  2. Never move the script inside the React-managed wrapper. The loader does
+ *     `script.parentNode.insertBefore(...)`, so if React re-renders and removes a
+ *     script nested in the wrapper, `parentNode` is null and the loader throws.
+ *     `document.body` is never reconciled by React, so the script stays attached
+ *     to a parent that is guaranteed to exist.
  */
 export default function NativeBanner({
   className,
   label,
   delayMs = 2500,
 }: NativeBannerProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [ready, setReady] = useState(false);
+  const bannerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setReady(true), delayMs);
-    return () => clearTimeout(timer);
-  }, [delayMs]);
-
-  useEffect(() => {
-    if (!ready) return;
-
     const inject = () => {
-      const container = containerRef.current;
-      if (!container) return;
+      const banner = bannerRef.current;
+      if (!banner) return;
 
-      // Clear stale markup, then always re-append a fresh script tag. On client
-      // side navigation the previous page's container is gone and the already
-      // loaded script will not rescan, so re-running it is what repopulates this
-      // container. Clearing before the tag is appended keeps them in order.
-      container.innerHTML = '';
+      // Duplicate-injection guard. This is also what repopulates the banner after
+      // a client-side navigation back to this route: the new wrapper is empty, so
+      // a fresh script is appended and re-executed.
+      if (banner.querySelector(`#${CONTAINER_ID}`)) return;
 
-      document.getElementById(SCRIPT_TAG_ID)?.remove();
+      const container = document.createElement('div');
+      container.id = CONTAINER_ID;
+      banner.appendChild(container);
 
       const script = document.createElement('script');
-      script.id = SCRIPT_TAG_ID;
-      script.async = true;
+      script.id = `adsterra-native-banner-script-${++injectionCount}`;
       script.src = NATIVE_SCRIPT_URL;
+      script.async = true;
+      script.setAttribute('data-cfasync', 'false');
       script.onerror = () =>
         console.warn('[Adsterra] Native banner script failed to load.');
       document.body.appendChild(script);
     };
 
-    // The container must exist before the script runs.
-    if (document.readyState === 'complete') {
-      inject();
-    } else {
-      window.addEventListener('load', inject, { once: true });
-      return () => window.removeEventListener('load', inject);
-    }
-  }, [ready]);
+    const timer = window.setTimeout(() => {
+      if (document.readyState === 'complete') {
+        inject();
+      } else {
+        window.addEventListener('load', inject, { once: true });
+      }
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [delayMs]);
 
   return (
     <aside
       aria-label={label ?? 'Advertisement'}
       className={className ?? 'my-4 w-full overflow-hidden'}
     >
-      {/* Adsterra writes ad nodes into this div outside React's control. */}
-      <div
-        ref={containerRef}
-        className="w-full"
-        data-adsterra-native={CONTAINER_ID}
-        suppressHydrationWarning
-      />
+      {/* Intentionally empty in JSX: React must never own the ad nodes. */}
+      <div ref={bannerRef} className="w-full" suppressHydrationWarning />
     </aside>
   );
 }
