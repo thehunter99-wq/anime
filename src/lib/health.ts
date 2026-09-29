@@ -195,13 +195,41 @@ export function checkAdsterra(): CheckResult {
   };
 }
 
-export function checkEmbedHosts(): CheckResult {
+export async function checkEmbedHosts(): Promise<CheckResult> {
+  const targets = [
+    { label: 'movie (vidsrc.pm)', url: 'https://vidsrc.pm/embed/movie/550' },
+    { label: 'tv (vidsrc.pm)', url: 'https://vidsrc.pm/embed/tv/1399/1/1' },
+    { label: 'anime (vidsrc.pm)', url: 'https://vidsrc.pm/embed/anime/21/1/0' },
+    { label: 'movie (vidsrc.sbs)', url: 'https://vidsrc.sbs/embed/movie/550' },
+  ];
+
+  const results = await Promise.all(
+    targets.map(async (target) => {
+      try {
+        const response = await timedFetch(target.url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+          },
+        });
+        return { label: target.label, code: response.status };
+      } catch (error) {
+        return { label: target.label, code: describeError(error) };
+      }
+    })
+  );
+
+  const failures = results.filter((r) => typeof r.code !== 'number' || r.code >= 400);
+
   return {
     id: 'embed-hosts',
     label: 'Video Embed Hosts',
-    detail: 'Player uses vidsrc.icu (anime/manga) and vidsrc.sbs (movie/TV), loaded client-side in an iframe',
-    status: 'ok',
-    hint: 'Only the browser talks to these hosts, so this check cannot run server-side.',
+    detail: results.map((r) => `${r.label}: ${r.code}`).join(' · '),
+    status: failures.length === 0 ? 'ok' : failures.length < results.length ? 'warn' : 'error',
+    hint:
+      failures.length > 0
+        ? 'A mirror is down. The viewer falls back to the next server automatically.'
+        : 'The player loads in a client-side iframe, so playback still depends on the browser reaching these hosts.',
   };
 }
 
@@ -211,7 +239,7 @@ export async function runAllChecks(): Promise<CheckResult[]> {
     checkAniList(),
     checkTMDBImages(),
   ]);
-  return [tmdb, anilist, images, checkAdsterra(), checkEmbedHosts()];
+  return [tmdb, anilist, images, checkAdsterra(), await checkEmbedHosts()];
 }
 
 export function summarize(results: CheckResult[]) {

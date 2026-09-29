@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Download, PlayCircle } from 'lucide-react';
 import RecommendedMovies from '@/components/recommended-movies';
 import { AdBanner } from '@/components/ads';
+import { getDownloadUrl } from '@/lib/embed';
 
 type Props = {
   params: Promise<{
@@ -134,7 +135,7 @@ export default async function MovieDetailsPage({ params }: Props) {
                 </Button>
                 <Button asChild variant="outline" className="mt-2 w-full">
                   <a
-                    href={`https://vidsrc.xyz/embed/movie/${movie.id}`}
+                    href={getDownloadUrl('movie', movie.id, 1, 1) ?? '#'}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
                   >

@@ -1,5 +1,6 @@
 import { type Media } from '@/lib/types';
 import { slugify } from '@/lib/utils';
+import { getEmbedSources } from '@/lib/embed';
 
 interface JsonLdProps {
   media: Media;
@@ -26,7 +27,7 @@ function JsonLd({ media, type, itemNumber }: JsonLdProps) {
       uploadDate: media.startDate
         ? `${media.startDate.year}-${String(media.startDate.month).padStart(2, '0')}-${String(media.startDate.day).padStart(2, '0')}`
         : new Date().toISOString(),
-      embedUrl: `https://vidsrc.icu/embed/anime/${media.id}/${itemNumber}`,
+      embedUrl: getEmbedSources('anime', media.id, itemNumber, 1, false)[0]?.url,
       partOfSeries: {
         '@type': 'TVSeries',
         name: title,

@@ -17,6 +17,7 @@ import {
 import { type TVShow } from '@/lib/types';
 import RecommendedTv from '@/components/recommended-tv';
 import { AdBanner } from '@/components/ads';
+import { getDownloadUrl } from '@/lib/embed';
 
 
 type Props = {
@@ -177,7 +178,7 @@ export default async function TVShowDetailsPage({ params }: Props) {
                <EpisodeSelector show={show} />
                <Button asChild variant="outline" className="mt-4 w-full">
                  <a
-                   href={`https://vidsrc.xyz/embed/tv/${show.id}`}
+                   href={getDownloadUrl('tv', show.id, 1, 1) ?? '#'}
                    target="_blank"
                    rel="noopener noreferrer nofollow"
                  >
