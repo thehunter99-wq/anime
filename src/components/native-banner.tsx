@@ -85,7 +85,13 @@ export default function NativeBanner({
       aria-label={label ?? 'Advertisement'}
       className={className ?? 'my-4 w-full overflow-hidden'}
     >
-      <div ref={containerRef} className="w-full" data-adsterra-native={CONTAINER_ID} />
+      {/* Adsterra writes ad nodes into this div outside React's control. */}
+      <div
+        ref={containerRef}
+        className="w-full"
+        data-adsterra-native={CONTAINER_ID}
+        suppressHydrationWarning
+      />
     </aside>
   );
 }

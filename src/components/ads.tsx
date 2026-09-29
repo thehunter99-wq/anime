@@ -1,7 +1,7 @@
 'use client';
 
 import Script from 'next/script';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 declare global {
   interface Window {
@@ -85,18 +85,40 @@ export function AdsterraSocialBar() {
 
 let nativeLoaded = false;
 
+/**
+ * Appends the Adsterra loader once per document.
+ *
+ * Loading is deferred until the window load event (plus an idle callback) so the
+ * loader can never inject ad nodes into a container React is still hydrating.
+ * With streaming SSR, effects for early components fire while later Suspense
+ * boundaries are still hydrating; injecting during that window is what produces
+ * the "extra DOM node" hydration mismatch.
+ */
 function loadNativeTag() {
   if (!CLIENT || nativeLoaded || typeof window === 'undefined') return;
-  nativeLoaded = true;
 
-  if (document.getElementById('adsterra-loader')) return;
+  const inject = () => {
+    if (document.getElementById('adsterra-loader')) return;
+    nativeLoaded = true;
 
-  const script = document.createElement('script');
-  script.id = 'adsterra-loader';
-  script.async = true;
-  script.crossOrigin = 'anonymous';
-  script.src = `https://ssat.pro/cdn/client.js?key=${CLIENT}&format=auto`;
-  document.head.appendChild(script);
+    const script = document.createElement('script');
+    script.id = 'adsterra-loader';
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.src = `https://ssat.pro/cdn/client.js?key=${CLIENT}&format=auto`;
+    document.head.appendChild(script);
+  };
+
+  const runWhenIdle =
+    typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback
+      : (cb: () => void) => window.setTimeout(cb, 1);
+
+  if (document.readyState === 'complete') {
+    runWhenIdle(inject);
+  } else {
+    window.addEventListener('load', () => runWhenIdle(inject), { once: true });
+  }
 }
 
 type AdSlotProps = {
@@ -105,12 +127,26 @@ type AdSlotProps = {
   label?: string;
 };
 
-let adCounter = 0;
-
+/**
+ * In-content ad slot.
+ *
+ * Hydration safety rules this component follows:
+ *  - `useId()` (never a module-level counter) so the slot id is identical on the
+ *    server and the client. A render-phase counter can desync between the
+ *    streaming server pass and hydration, producing a real id mismatch.
+ *  - The `atOptions.push` script is only rendered after mount, so the server HTML
+ *    and the first client render are byte-identical (empty container).
+ *  - `suppressHydrationWarning` is scoped to this one container, because Adsterra
+ *    injects ad DOM into it outside React's control. This is the only legitimate
+ *    use of the prop — putting it on <html>/<body> would mask unrelated bugs.
+ */
 export function AdBanner({ format = 'auto', className, label }: AdSlotProps) {
-  const [slotId] = useState(() => `adsterra-${format}-${++adCounter}`);
+  const reactId = useId();
+  const slotId = `adsterra-${format}-${reactId.replace(/[^a-zA-Z0-9]/g, '')}`;
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     loadNativeTag();
   }, []);
 
@@ -121,13 +157,15 @@ export function AdBanner({ format = 'auto', className, label }: AdSlotProps) {
       aria-label={label ?? 'Advertisement'}
       className={className ?? 'my-6 w-full overflow-hidden'}
     >
-      <div className="adsterra w-full" id={slotId}>
-        <script
-          type="text/javascript"
-          dangerouslySetInnerHTML={{
-            __html: `(atOptions = atOptions || []).push({ key: '${CLIENT}', format: '${format}', params: {} });`,
-          }}
-        />
+      <div id={slotId} className="adsterra w-full" suppressHydrationWarning>
+        {mounted ? (
+          <script
+            type="text/javascript"
+            dangerouslySetInnerHTML={{
+              __html: `(atOptions = atOptions || []).push({ key: '${CLIENT}', format: '${format}', params: {} });`,
+            }}
+          />
+        ) : null}
       </div>
     </aside>
   );
