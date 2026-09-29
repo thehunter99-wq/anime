@@ -4,7 +4,6 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { Analytics } from "@vercel/analytics/next";
 import DisclaimerModal from "@/components/disclaimer-modal";
 import { AdBanner } from "@/components/ads";
 
@@ -155,7 +154,6 @@ export default function RootLayout({
         </div>
         <Footer />
         <Toaster />
-        <Analytics />
       </body>
     </html>
   );

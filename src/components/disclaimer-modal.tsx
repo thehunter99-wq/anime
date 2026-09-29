@@ -36,6 +36,10 @@ export default function DisclaimerModal() {
             <AniMovieLogo className="h-14 w-14 text-primary mb-4" />
             <AlertDialogHeader>
                 <AlertDialogTitle className="text-2xl font-bold">AniMovie Disclaimer</AlertDialogTitle>
+                <AlertDialogDescription className="sr-only">
+                    Please read the terms below. By continuing you acknowledge that all media is provided by
+                    third-party sources and that AniMovie does not host any media files.
+                </AlertDialogDescription>
             </AlertDialogHeader>
         </div>
         

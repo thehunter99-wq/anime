@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { type Media } from '@/lib/types';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn, slugify } from '@/lib/utils';
 import { AdBanner } from '@/components/ads';
+import { getEmbedSources, getDownloadUrl, hasDownload } from '@/lib/embed';
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -28,23 +29,6 @@ interface ViewerProps {
   initialSeasonNumber?: number;
   type: 'anime' | 'manga' | 'movie' | 'tv';
 }
-
-const getIframeSrc = (type: 'anime' | 'manga' | 'movie' | 'tv', mediaId: number | string, itemNumber: number, seasonNumber: number, isDub: boolean) => {
-  if (type === 'anime') {
-    return `https://vidsrc.icu/embed/anime/${mediaId}/${itemNumber}/${isDub ? '1' : '0'}`;
-  }
-  if (type === 'manga') {
-    return `https://vidsrc.icu/embed/manga/${mediaId}/${itemNumber}`;
-  }
-  if (type === 'movie') {
-    return `https://vidsrc.sbs/embed/movie/${mediaId}`;
-  }
-  if (type === 'tv') {
-    return `https://vidsrc.sbs/embed/tv/${mediaId}/${seasonNumber}/${itemNumber}`;
-  }
-  return '';
-};
-
 
 export default function Viewer({
   media,
@@ -66,8 +50,30 @@ export default function Viewer({
   const isTv = type === 'tv';
 
   const mediaId = (isMovie || isTv) ? media.id : (media.imdb_id || media.id);
-  const [iframeSrc, setIframeSrc] = useState(() => getIframeSrc(type, mediaId, initialItemNumber, initialSeasonNumber, isDub));
+
+  const sources = getEmbedSources(type, mediaId, itemNumber, seasonNumber, isDub);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const activeSource = sources[Math.min(sourceIndex, sources.length - 1)];
+  const iframeSrc = activeSource?.url ?? '';
+
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const downloadUrl = getDownloadUrl(type, mediaId, itemNumber, seasonNumber);
+
+  useEffect(() => {
+    setSourceIndex(0);
+    setLoadFailed(false);
+  }, [itemNumber, seasonNumber, isDub, mediaId, type]);
+
+  const tryNextServer = () => {
+    if (sourceIndex < sources.length - 1) {
+      setSourceIndex((i) => i + 1);
+      setIsLoading(true);
+      setLoadFailed(false);
+    } else {
+      setLoadFailed(true);
+    }
+  };
 
   const title = media.title.english || media.title.romaji;
   
@@ -75,8 +81,6 @@ export default function Viewer({
 
   useEffect(() => {
     setIsLoading(true);
-    const newSrc = getIframeSrc(type, mediaId, itemNumber, seasonNumber, isDub);
-    setIframeSrc(newSrc);
 
     const slug = slugify(title);
     let newUrl = `/view/${type}/${media.id}-${slug}`;
@@ -180,6 +184,14 @@ export default function Viewer({
             />
           </div>
         )}
+        {hasDownload(type) && downloadUrl && (
+          <Button asChild variant="outline" size="sm" className={isManga ? 'bg-white dark:bg-stone-800' : ''}>
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer nofollow">
+              <Download className="mr-2 h-4 w-4" />
+              Download HD
+            </a>
+          </Button>
+        )}
         </div>
       </header>
 
@@ -189,12 +201,27 @@ export default function Viewer({
              <Loader2 className="h-8 w-8 animate-spin text-primary" />
            </div>
         )}
-        {iframeSrc && (
+        {loadFailed && (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              This server did not respond. Try another server or reload.
+            </p>
+            <Button onClick={tryNextServer} variant="secondary">
+              Switch server
+            </Button>
+          </div>
+        )}
+        {iframeSrc && !loadFailed && (
           <iframe
             key={iframeSrc}
             src={iframeSrc}
-            onLoad={() => setIsLoading(false)}
+            onLoad={() => {
+              setIsLoading(false);
+              setLoadFailed(false);
+            }}
             allowFullScreen
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+            referrerPolicy="origin"
             className={cn(
               'h-full w-full border-0',
               isLoading ? 'hidden' : 'block',
@@ -204,6 +231,26 @@ export default function Viewer({
           ></iframe>
         )}
       </main>
+
+      {sources.length > 1 && (
+        <div className="container mx-auto flex items-center justify-center gap-2 px-4 pb-2">
+          <span className="text-xs text-muted-foreground">Server</span>
+          {sources.map((source, index) => (
+            <Button
+              key={source.id}
+              size="sm"
+              variant={index === sourceIndex ? 'default' : 'secondary'}
+              onClick={() => {
+                setSourceIndex(index);
+                setIsLoading(true);
+                setLoadFailed(false);
+              }}
+            >
+              {source.label}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {!isMovie && (
         <div className="container mx-auto px-4 pb-2">

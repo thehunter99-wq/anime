@@ -17,6 +17,11 @@ const navItems = [
   { name: 'TV Shows', tab: 'tv' },
 ];
 
+const STANDALONE_LINKS = [
+  { name: 'Web Series', href: '/tv' },
+  { name: 'Status', href: '/diagnostics' },
+];
+
 function HeaderNavigation({ isMobile, onLinkClick }: { isMobile?: boolean; onLinkClick?: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -57,11 +62,16 @@ function HeaderNavigation({ isMobile, onLinkClick }: { isMobile?: boolean; onLin
             </Button>
           </Link>
         ))}
-        <Link href="/diagnostics" passHref onClick={onLinkClick}>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground">
-            System Status
-          </Button>
-        </Link>
+        {STANDALONE_LINKS.map((link) => (
+          <Link href={link.href} passHref key={link.href} onClick={onLinkClick}>
+            <Button
+              variant={pathname === link.href ? 'secondary' : 'ghost'}
+              className="w-full justify-start"
+            >
+              {link.name}
+            </Button>
+          </Link>
+        ))}
       </nav>
     );
   }
@@ -84,15 +94,23 @@ function HeaderNavigation({ isMobile, onLinkClick }: { isMobile?: boolean; onLin
           </Button>
         </Link>
       ))}
-        <Link href="/diagnostics" passHref>
+      <span className="mx-1 h-5 w-px bg-border/60" />
+      {STANDALONE_LINKS.map((link) => (
+        <Link href={link.href} passHref key={link.href}>
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full text-muted-foreground hover:text-foreground"
+            className={cn(
+              'rounded-full transition-colors',
+              pathname === link.href
+                ? 'bg-background/70 text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
           >
-            Status
+            {link.name}
           </Button>
         </Link>
+      ))}
     </nav>
   );
 }

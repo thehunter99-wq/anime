@@ -7,7 +7,7 @@ import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PlayCircle } from 'lucide-react';
+import { Download, PlayCircle } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -175,6 +175,16 @@ export default async function TVShowDetailsPage({ params }: Props) {
                 Seasons & Episodes
               </h2>
                <EpisodeSelector show={show} />
+               <Button asChild variant="outline" className="mt-4 w-full">
+                 <a
+                   href={`https://vidsrc.xyz/embed/tv/${show.id}`}
+                   target="_blank"
+                   rel="noopener noreferrer nofollow"
+                 >
+                   <Download className="mr-2 h-4 w-4" />
+                   Download HD
+                 </a>
+               </Button>
              </div>
            </div>
           <AdBanner />

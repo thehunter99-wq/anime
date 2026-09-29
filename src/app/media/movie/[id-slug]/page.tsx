@@ -7,7 +7,7 @@ import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PlayCircle } from 'lucide-react';
+import { Download, PlayCircle } from 'lucide-react';
 import RecommendedMovies from '@/components/recommended-movies';
 import { AdBanner } from '@/components/ads';
 
@@ -131,6 +131,16 @@ export default async function MovieDetailsPage({ params }: Props) {
                     <PlayCircle className="mr-2" />
                     Play Movie
                   </Link>
+                </Button>
+                <Button asChild variant="outline" className="mt-2 w-full">
+                  <a
+                    href={`https://vidsrc.xyz/embed/movie/${movie.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                  >
+                    <Download className="mr-2" />
+                    Download HD
+                  </a>
                 </Button>
              </div>
            </div>
