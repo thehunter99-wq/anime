@@ -1,5 +1,6 @@
 'use client';
 
+import Script from 'next/script';
 import { useEffect, useId, useState } from 'react';
 
 declare global {
@@ -38,88 +39,47 @@ const POPUNDER_URL =
  */
 const POPUNDER_ENABLED = process.env.NODE_ENV === 'production';
 
-/**
- * Injects an Adsterra global script exactly once per document.
- *
- * Imperative rather than next/script so React never owns the script node: an ad
- * script that rewrites or removes its own tag can then never put React's tree
- * and the real DOM out of sync. The element is created in a post-hydration
- * effect, so nothing here exists during the hydration pass.
- */
-function injectGlobalScript(id: string, src: string) {
-  if (typeof window === 'undefined') return;
-  if (document.getElementById(id)) return;
-
-  const script = document.createElement('script');
-  script.id = id;
-  script.src = src;
-  script.async = true;
-  script.setAttribute('data-cfasync', 'false');
-  script.onerror = () => console.warn(`[Adsterra] ${id} failed to load.`);
-  document.body.appendChild(script);
-}
-
 export function AdsterraPopunder() {
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
     if (!POPUNDER_ENABLED) return;
-    const timer = window.setTimeout(
-      () => injectGlobalScript('adsterra-popunder', POPUNDER_URL),
-      4500,
-    );
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(() => setReady(true), 4500);
+    return () => clearTimeout(timer);
   }, []);
 
-  return null;
+  if (!ready) return null;
+
+  return (
+    <Script
+      id="adsterra-popunder"
+      src={POPUNDER_URL}
+      strategy="afterInteractive"
+      async
+      onError={() => console.warn('[Adsterra] Popunder script failed to load.')}
+    />
+  );
 }
 
 export function AdsterraSocialBar() {
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
-    const timer = window.setTimeout(
-      () => injectGlobalScript('adsterra-social-bar', SOCIAL_BAR_URL),
-      1200,
-    );
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(() => setReady(true), 1200);
+    return () => clearTimeout(timer);
   }, []);
 
-  return null;
-}
+  if (!ready) return null;
 
-let nativeLoaded = false;
-
-/**
- * Appends the Adsterra loader once per document.
- *
- * Loading is deferred until the window load event (plus an idle callback) so the
- * loader can never inject ad nodes into a container React is still hydrating.
- * With streaming SSR, effects for early components fire while later Suspense
- * boundaries are still hydrating; injecting during that window is what produces
- * the "extra DOM node" hydration mismatch.
- */
-function loadNativeTag() {
-  if (!CLIENT || nativeLoaded || typeof window === 'undefined') return;
-
-  const inject = () => {
-    if (document.getElementById('adsterra-loader')) return;
-    nativeLoaded = true;
-
-    const script = document.createElement('script');
-    script.id = 'adsterra-loader';
-    script.async = true;
-    script.crossOrigin = 'anonymous';
-    script.src = `https://ssat.pro/cdn/client.js?key=${CLIENT}&format=auto`;
-    document.head.appendChild(script);
-  };
-
-  const runWhenIdle =
-    typeof window.requestIdleCallback === 'function'
-      ? window.requestIdleCallback
-      : (cb: () => void) => window.setTimeout(cb, 1);
-
-  if (document.readyState === 'complete') {
-    runWhenIdle(inject);
-  } else {
-    window.addEventListener('load', () => runWhenIdle(inject), { once: true });
-  }
+  return (
+    <Script
+      id="adsterra-social-bar"
+      src={SOCIAL_BAR_URL}
+      strategy="afterInteractive"
+      async
+      onError={() => console.warn('[Adsterra] Social bar script failed to load.')}
+    />
+  );
 }
 
 type AdSlotProps = {
@@ -131,25 +91,19 @@ type AdSlotProps = {
 /**
  * In-content ad slot.
  *
- * Hydration safety rules this component follows:
- *  - `useId()` (never a module-level counter) so the slot id is identical on the
- *    server and the client. A render-phase counter can desync between the
- *    streaming server pass and hydration, producing a real id mismatch.
- *  - The `atOptions.push` script is only rendered after mount, so the server HTML
- *    and the first client render are byte-identical (empty container).
- *  - `suppressHydrationWarning` is scoped to this one container, because Adsterra
- *    injects ad DOM into it outside React's control. This is the only legitimate
- *    use of the prop — putting it on <html>/<body> would mask unrelated bugs.
+ * The inline `atOptions.push` script is rendered in JSX on purpose rather than
+ * injected from an effect: its contents are fully determined at build time, so
+ * the server and client emit byte-identical markup and there is no hydration
+ * mismatch. Keeping it in JSX also guarantees it runs before the `afterInteractive`
+ * loader below, which is what registers the slot.
+ *
+ * `useId()` supplies the slot id. A module-level counter is not safe here: it is
+ * render-phase state that can desync between the streaming server pass and
+ * hydration, which produces a real `id` mismatch.
  */
 export function AdBanner({ format = 'auto', className, label }: AdSlotProps) {
   const reactId = useId();
   const slotId = `adsterra-${format}-${reactId.replace(/[^a-zA-Z0-9]/g, '')}`;
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    loadNativeTag();
-  }, []);
 
   if (!CLIENT) return null;
 
@@ -159,15 +113,20 @@ export function AdBanner({ format = 'auto', className, label }: AdSlotProps) {
       className={className ?? 'my-6 w-full overflow-hidden'}
     >
       <div id={slotId} className="adsterra w-full" suppressHydrationWarning>
-        {mounted ? (
-          <script
-            type="text/javascript"
-            dangerouslySetInnerHTML={{
-              __html: `(atOptions = atOptions || []).push({ key: '${CLIENT}', format: '${format}', params: {} });`,
-            }}
-          />
-        ) : null}
+        <script
+          type="text/javascript"
+          dangerouslySetInnerHTML={{
+            __html: `(atOptions = atOptions || []).push({ key: '${CLIENT}', format: '${format}', params: {} });`,
+          }}
+        />
       </div>
+      <Script
+        id="adsterra-loader"
+        src={`https://ssat.pro/cdn/client.js?key=${CLIENT}&format=auto`}
+        strategy="afterInteractive"
+        async
+        onError={() => console.warn('[Adsterra] In-content loader failed to load.')}
+      />
     </aside>
   );
 }
