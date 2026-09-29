@@ -1,23 +1,23 @@
 import { notFound } from 'next/navigation';
 import { fetchMediaById } from '@/lib/anilist';
-import type { Metadata, ResolvingMetadata } from 'next';
+import type { Metadata } from 'next';
 import { slugify } from '@/lib/utils';
 import JsonLd from '@/components/json-ld';
 import Viewer from '@/components/viewer';
 
 type Props = {
-  params: {
+  params: Promise<{
     type: 'anime' | 'manga';
     'id-slug': string;
-  };
-  searchParams: { [key: string]: string | string[] | undefined };
+  }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata(
-  { params, searchParams }: Props,
-  parent: ResolvingMetadata
+  { params, searchParams }: Props
 ): Promise<Metadata> {
-  const { 'id-slug': idSlug, type } = params;
+  const { 'id-slug': idSlug, type } = await params;
+  const resolvedSearchParams = await searchParams;
   const id = parseInt(idSlug.split('-')[0]);
 
   if (isNaN(id)) {
@@ -32,7 +32,7 @@ export async function generateMetadata(
   const title = media.title.english || media.title.romaji;
   const isAnime = type === 'anime';
   const itemType = isAnime ? 'Episode' : 'Chapter';
-  const itemNumber = searchParams?.item || '1';
+  const itemNumber = resolvedSearchParams?.item || '1';
 
   return {
     title: `${isAnime ? 'Watch' : 'Read'} ${title} ${itemType} ${itemNumber}`,
@@ -47,9 +47,10 @@ export async function generateMetadata(
 }
 
 export default async function ViewPage({ params, searchParams }: Props) {
-  const { 'id-slug': idSlug, type } = params;
+  const { 'id-slug': idSlug, type } = await params;
+  const resolvedSearchParams = await searchParams;
   const id = parseInt(idSlug.split('-')[0], 10);
-  const itemNumberParam = searchParams?.item;
+  const itemNumberParam = resolvedSearchParams?.item;
   const initialItemNumber = Array.isArray(itemNumberParam)
     ? parseInt(itemNumberParam[0], 10)
     : parseInt(itemNumberParam || '1', 10);

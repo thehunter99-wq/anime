@@ -1,23 +1,23 @@
 
 import { notFound } from 'next/navigation';
-import { fetchTVShowById } from '@/lib/tmdb';
-import type { Metadata, ResolvingMetadata } from 'next';
+import { fetchTVShowById, getTMDBImageUrl } from '@/lib/tmdb';
+import type { Metadata } from 'next';
 import { slugify } from '@/lib/utils';
 import Viewer from '@/components/viewer';
 
 type Props = {
-  params: {
+  params: Promise<{
     type: 'tv';
     'id-slug': string;
-  };
-  searchParams: { [key: string]: string | string[] | undefined };
+  }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata(
-  { params, searchParams }: Props,
-  parent: ResolvingMetadata
+  { params, searchParams }: Props
 ): Promise<Metadata> {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
+  const resolvedSearchParams = await searchParams;
   const id = parseInt(idSlug.split('-')[0]);
 
   if (isNaN(id)) {
@@ -30,26 +30,29 @@ export async function generateMetadata(
   }
 
   const title = show.name;
-  const season = searchParams?.season || '1';
-  const episode = searchParams?.episode || '1';
-  
+  const season = resolvedSearchParams?.season || '1';
+  const episode = resolvedSearchParams?.episode || '1';
+  const description = `Stream season ${season} episode ${episode} of the series ${title} in high quality.`;
+  const imageUrl = getTMDBImageUrl(show.backdrop_path || show.poster_path, 'original');
+
   return {
     title: `Watch ${title} S${season} E${episode}`,
-    description: `Stream season ${season} episode ${episode} of the series ${title} in high quality.`,
+    description,
     openGraph: {
-        ...((await parent).openGraph || {}),
-        title: `Watch ${title} S${season} E${episode}`,
-        description: `Stream season ${season} episode ${episode} of the series ${title} in high quality.`,
-        type: 'video.episode',
+      title: `Watch ${title} S${season} E${episode}`,
+      description,
+      images: imageUrl ? [imageUrl] : [],
+      type: 'video.episode',
     },
   };
 }
 
 export default async function ViewPage({ params, searchParams }: Props) {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
+  const resolvedSearchParams = await searchParams;
   const id = parseInt(idSlug.split('-')[0], 10);
-  const season = searchParams?.season || '1';
-  const episode = searchParams?.episode || '1';
+  const season = resolvedSearchParams?.season || '1';
+  const episode = resolvedSearchParams?.episode || '1';
   
   if (isNaN(id)) {
     notFound();

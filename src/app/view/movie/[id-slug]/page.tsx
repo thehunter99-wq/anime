@@ -1,22 +1,21 @@
 import { notFound } from 'next/navigation';
-import { fetchMovieById } from '@/lib/tmdb';
-import type { Metadata, ResolvingMetadata } from 'next';
+import { fetchMovieById, getTMDBImageUrl } from '@/lib/tmdb';
+import type { Metadata } from 'next';
 import { slugify } from '@/lib/utils';
 import Viewer from '@/components/viewer';
 
 type Props = {
-  params: {
+  params: Promise<{
     type: 'movie';
     'id-slug': string;
-  };
-  searchParams: { [key: string]: string | string[] | undefined };
+  }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata(
-  { params }: Props,
-  parent: ResolvingMetadata
+  { params }: Props
 ): Promise<Metadata> {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
   const id = parseInt(idSlug.split('-')[0]);
 
   if (isNaN(id)) {
@@ -29,21 +28,23 @@ export async function generateMetadata(
   }
 
   const title = movie.title;
-  
+  const description = `Stream the movie ${title} in high quality.`;
+  const imageUrl = getTMDBImageUrl(movie.backdrop_path || movie.poster_path, 'original');
+
   return {
     title: `Watch ${title}`,
-    description: `Stream the movie ${title} in high quality.`,
+    description,
     openGraph: {
-        ...((await parent).openGraph || {}),
-        title: `Watch ${title}`,
-        description: `Stream the movie ${title} in high quality.`,
-        type: 'video.movie',
+      title: `Watch ${title}`,
+      description,
+      images: imageUrl ? [imageUrl] : [],
+      type: 'video.movie',
     },
   };
 }
 
 export default async function ViewPage({ params }: Props) {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
   const id = parseInt(idSlug.split('-')[0], 10);
   
   if (isNaN(id)) {

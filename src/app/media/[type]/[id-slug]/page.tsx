@@ -8,18 +8,19 @@ import { SeasonEpisodeSelector } from '@/components/season-episode-selector';
 import { Badge } from '@/components/ui/badge';
 import RelatedMedia from '@/components/related-media';
 import RecommendedMedia from '@/components/recommended-media';
+import { AdBanner } from '@/components/ads';
 
 type Props = {
-  params: {
+  params: Promise<{
     type: 'anime' | 'manga';
     'id-slug': string;
-  };
+  }>;
 };
 
 export async function generateMetadata(
   { params }: Props
 ): Promise<Metadata> {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
   const id = parseInt(idSlug.split('-')[0]);
 
   if (isNaN(id)) {
@@ -47,7 +48,7 @@ export async function generateMetadata(
 }
 
 export default async function MediaDetailsPage({ params }: Props) {
-  const { 'id-slug': idSlug, type } = params;
+  const { 'id-slug': idSlug, type } = await params;
   const id = parseInt(idSlug.split('-')[0], 10);
 
   if (isNaN(id) || !['anime', 'manga'].includes(type)) {
@@ -129,6 +130,8 @@ export default async function MediaDetailsPage({ params }: Props) {
                 <SeasonEpisodeSelector media={media} />
               </div>
             </div>
+
+            <AdBanner />
 
             {media.relations && <RelatedMedia relations={media.relations} />}
             <RecommendedMedia media={media} />

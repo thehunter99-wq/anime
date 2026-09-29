@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Analytics } from "@vercel/analytics/next";
 import DisclaimerModal from "@/components/disclaimer-modal";
+import { AdBanner } from "@/components/ads";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -58,6 +59,12 @@ function Footer() {
               className="hover:text-primary transition-colors"
             >
               Privacy Policy
+            </Link>
+            <Link
+              href="/diagnostics"
+              className="hover:text-primary transition-colors"
+            >
+              System Status
             </Link>
           </nav>
 
@@ -143,6 +150,9 @@ export default function RootLayout({
       >
         <DisclaimerModal />
         <div className="flex-grow">{children}</div>
+        <div className="container mx-auto px-4 pb-4 sm:px-6 lg:px-8">
+          <AdBanner label="Advertisement" />
+        </div>
         <Footer />
         <Toaster />
         <Analytics />

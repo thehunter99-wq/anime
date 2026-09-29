@@ -18,8 +18,11 @@ import { slugify, cn } from '@/lib/utils';
 
 type Suggestion = Media | Movie | TVShow;
 
+const isAniListMedia = (item: Suggestion): item is Media =>
+    'title' in item && typeof item.title === 'object';
+
 const getSuggestionUrl = (item: Suggestion, type: string): string => {
-    if ('title' in item && typeof item.title === 'object') { // AniList Media
+    if (isAniListMedia(item)) { // AniList Media
         const title = item.title.english || item.title.romaji;
         return `/media/${item.type.toLowerCase()}/${item.id}-${slugify(title)}`;
     }
@@ -33,7 +36,7 @@ const getSuggestionUrl = (item: Suggestion, type: string): string => {
 }
 
 const getSuggestionTitle = (item: Suggestion): string => {
-    if ('title' in item && typeof item.title === 'object') return item.title.english || item.title.romaji;
+    if (isAniListMedia(item)) return item.title.english || item.title.romaji;
     if ('title' in item && typeof item.title === 'string') return item.title;
     if ('name' in item) return item.name;
     return 'Unknown';

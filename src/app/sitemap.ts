@@ -23,8 +23,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       sort: ['POPULARITY_DESC'],
       perPage: 100, // Fetch 100 most popular items for the sitemap
     });
-  } catch (error) {
-    console.error('Failed to fetch media for sitemap:', error);
+  } catch {
+    console.warn('[sitemap] Could not fetch AniList media; returning static routes only.');
     return staticRoutes;
   }
 

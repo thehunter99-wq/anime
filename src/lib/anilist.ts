@@ -1,5 +1,6 @@
 
 import { type AniListResponse, type AniListMediaResponse, type Media } from './types';
+import { fetchWithRetry } from './health';
 
 const ANILIST_API_URL = 'https://graphql.anilist.co';
 
@@ -81,16 +82,16 @@ async function anilistFetch(query: string, variables: object) {
   };
 
   try {
-    const response = await fetch(ANILIST_API_URL, options);
+    const response = await fetchWithRetry(ANILIST_API_URL, options);
 
     if (!response.ok) {
-      console.error(`AniList API responded with status: ${response.status}`);
+      console.warn(`[AniList] responded with HTTP ${response.status}`);
       return { data: null }; // Return a consistent shape on error
     }
 
     return response.json();
-  } catch (error) {
-    console.error('Failed to fetch from AniList:', error);
+  } catch {
+    console.warn('[AniList] graphql.anilist.co unreachable. Check /diagnostics.');
     return { data: null }; // Return a consistent shape on error
   }
 }

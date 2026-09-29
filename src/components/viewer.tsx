@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn, slugify } from '@/lib/utils';
+import { AdBanner } from '@/components/ads';
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -203,6 +204,12 @@ export default function Viewer({
           ></iframe>
         )}
       </main>
+
+      {!isMovie && (
+        <div className="container mx-auto px-4 pb-2">
+          <AdBanner className="w-full overflow-hidden" />
+        </div>
+      )}
 
       {(!isMovie) && (
         <footer className="container mx-auto flex items-center justify-between p-4">

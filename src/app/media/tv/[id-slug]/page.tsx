@@ -16,18 +16,19 @@ import {
 } from "@/components/ui/accordion"
 import { type TVShow } from '@/lib/types';
 import RecommendedTv from '@/components/recommended-tv';
+import { AdBanner } from '@/components/ads';
 
 
 type Props = {
-  params: {
+  params: Promise<{
     'id-slug': string;
-  };
+  }>;
 };
 
 export async function generateMetadata(
   { params }: Props
 ): Promise<Metadata> {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
   const id = parseInt(idSlug.split('-')[0]);
 
   if (isNaN(id)) {
@@ -96,7 +97,7 @@ function EpisodeSelector({ show }: { show: TVShow }) {
 
 
 export default async function TVShowDetailsPage({ params }: Props) {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
   const id = parseInt(idSlug.split('-')[0], 10);
 
   if (isNaN(id)) {
@@ -173,9 +174,10 @@ export default async function TVShowDetailsPage({ params }: Props) {
               <h2 className="text-2xl font-bold mb-4">
                 Seasons & Episodes
               </h2>
-              <EpisodeSelector show={show} />
-            </div>
-          </div>
+               <EpisodeSelector show={show} />
+             </div>
+           </div>
+          <AdBanner />
           <div className="mt-12">
             <RecommendedTv show={show} />
           </div>

@@ -12,6 +12,7 @@ import TvGrid from '@/components/tv-grid';
 import HeroCarousel from '@/components/hero-carousel';
 import MovieHeroCarousel from '@/components/movie-hero-carousel';
 import TvHeroCarousel from '@/components/tv-hero-carousel';
+import { AdBanner } from '@/components/ads';
 
 
 export const revalidate = 3600; // Revalidate every hour
@@ -19,10 +20,11 @@ export const revalidate = 3600; // Revalidate every hour
 export default async function Home({
   searchParams,
 }: {
-  searchParams?: { query?: string; tab?: string };
+  searchParams?: Promise<{ query?: string; tab?: string }>;
 }) {
-  const query = searchParams?.query || '';
-  const tab = searchParams?.tab || 'anime';
+  const resolvedSearchParams = await searchParams;
+  const query = resolvedSearchParams?.query || '';
+  const tab = resolvedSearchParams?.tab || 'anime';
 
   let trendingAnime: Media[] = [];
   let popularAnime: Media[] = [];
@@ -119,6 +121,9 @@ export default async function Home({
             {heroMangaItems.length > 0 && tab === 'manga' && <HeroCarousel items={heroMangaItems} />}
             {heroMovieItems.length > 0 && tab === 'movies' && <MovieHeroCarousel items={heroMovieItems} />}
             {heroTvItems.length > 0 && tab === 'tv' && <TvHeroCarousel items={heroTvItems} />}
+            <div className="container mx-auto px-4 pt-6 sm:px-6 lg:px-8">
+              <AdBanner />
+            </div>
             <div className="container mx-auto space-y-12 px-4 py-8 sm:px-6 lg:px-8">
               {tab === 'anime' && (
                 <>

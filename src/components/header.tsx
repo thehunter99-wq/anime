@@ -57,6 +57,11 @@ function HeaderNavigation({ isMobile, onLinkClick }: { isMobile?: boolean; onLin
             </Button>
           </Link>
         ))}
+        <Link href="/diagnostics" passHref onClick={onLinkClick}>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground">
+            System Status
+          </Button>
+        </Link>
       </nav>
     );
   }
@@ -79,6 +84,15 @@ function HeaderNavigation({ isMobile, onLinkClick }: { isMobile?: boolean; onLin
           </Button>
         </Link>
       ))}
+        <Link href="/diagnostics" passHref>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-muted-foreground hover:text-foreground"
+          >
+            Status
+          </Button>
+        </Link>
     </nav>
   );
 }

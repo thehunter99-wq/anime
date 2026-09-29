@@ -9,17 +9,18 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
 import RecommendedMovies from '@/components/recommended-movies';
+import { AdBanner } from '@/components/ads';
 
 type Props = {
-  params: {
+  params: Promise<{
     'id-slug': string;
-  };
+  }>;
 };
 
 export async function generateMetadata(
   { params }: Props
 ): Promise<Metadata> {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
   const id = parseInt(idSlug.split('-')[0]);
 
   if (isNaN(id)) {
@@ -48,7 +49,7 @@ export async function generateMetadata(
 }
 
 export default async function MovieDetailsPage({ params }: Props) {
-  const { 'id-slug': idSlug } = params;
+  const { 'id-slug': idSlug } = await params;
   const id = parseInt(idSlug.split('-')[0], 10);
 
   if (isNaN(id)) {
@@ -121,18 +122,19 @@ export default async function MovieDetailsPage({ params }: Props) {
               <h2 className="text-2xl font-bold">Synopsis</h2>
               <p className="whitespace-pre-line text-foreground/80">{description}</p>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold mb-4">
-                Watch Now
-              </h2>
-               <Button asChild className="w-full">
+             <div>
+               <h2 className="text-2xl font-bold mb-4">
+                 Watch Now
+               </h2>
+                <Button asChild className="w-full">
                   <Link href={watchUrl}>
                     <PlayCircle className="mr-2" />
                     Play Movie
                   </Link>
                 </Button>
-            </div>
-          </div>
+             </div>
+           </div>
+          <AdBanner />
           <div className="mt-12">
             <RecommendedMovies movie={movie} />
           </div>
