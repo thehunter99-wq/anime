@@ -19,6 +19,36 @@ export const metadata: Metadata = {
   },
   description:
     "Your one-stop platform for streaming the latest anime, reading popular manga, and watching movies. All for free, with sub and dub options available.",
+  other: {
+    // Rendered by Next into <head> itself. Using an explicit <head> tag in an
+    // App Router root layout fights the router's own head management and is a
+    // known source of hydration mismatches.
+    "script:ld+json": JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "Animovie",
+      url: "https://animovie.parthakashyap.com",
+      creator: {
+        "@type": "Person",
+        "@id": "https://parthakashyap.com/#person",
+        name: "Partha Pratim Kashyap",
+        alternateName: [
+          "Partha",
+          "Partha Pratim",
+          "Partha Kashyap",
+          "Pratim Kashyap",
+        ],
+        jobTitle: "Web and Mobile Application Developer",
+        email: "parthakashyal@gmail.com",
+        url: "https://parthakashyap.com",
+        sameAs: [
+          "https://linkedin.com/in/partha-pratim-kashyap",
+          "https://github.com/parthakashyap",
+          "https://instagram.com/partha_kashyap__",
+        ],
+      },
+    }),
+  },
 };
 
 function Footer() {
@@ -109,38 +139,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebApplication",
-              name: "Animovie",
-              url: "https://animovie.parthakashyap.com",
-              creator: {
-                "@type": "Person",
-                "@id": "https://parthakashyap.com/#person",
-                name: "Partha Pratim Kashyap",
-                alternateName: [
-                  "Partha",
-                  "Partha Pratim",
-                  "Partha Kashyap",
-                  "Pratim Kashyap",
-                ],
-                jobTitle: "Web and Mobile Application Developer",
-                email: "parthakashyal@gmail.com",
-                url: "https://parthakashyap.com",
-                sameAs: [
-                  "https://linkedin.com/in/partha-pratim-kashyap",
-                  "https://github.com/parthakashyap",
-                  "https://instagram.com/partha_kashyap__",
-                ],
-              },
-            }),
-          }}
-        />
-      </head>
       <body
         suppressHydrationWarning
         className={cn(

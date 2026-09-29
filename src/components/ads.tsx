@@ -1,6 +1,5 @@
 'use client';
 
-import Script from 'next/script';
 import { useEffect, useId, useState } from 'react';
 
 declare global {
@@ -39,47 +38,50 @@ const POPUNDER_URL =
  */
 const POPUNDER_ENABLED = process.env.NODE_ENV === 'production';
 
-export function AdsterraPopunder() {
-  const [ready, setReady] = useState(false);
+/**
+ * Injects an Adsterra global script exactly once per document.
+ *
+ * Imperative rather than next/script so React never owns the script node: an ad
+ * script that rewrites or removes its own tag can then never put React's tree
+ * and the real DOM out of sync. The element is created in a post-hydration
+ * effect, so nothing here exists during the hydration pass.
+ */
+function injectGlobalScript(id: string, src: string) {
+  if (typeof window === 'undefined') return;
+  if (document.getElementById(id)) return;
 
+  const script = document.createElement('script');
+  script.id = id;
+  script.src = src;
+  script.async = true;
+  script.setAttribute('data-cfasync', 'false');
+  script.onerror = () => console.warn(`[Adsterra] ${id} failed to load.`);
+  document.body.appendChild(script);
+}
+
+export function AdsterraPopunder() {
   useEffect(() => {
     if (!POPUNDER_ENABLED) return;
-    const timer = setTimeout(() => setReady(true), 4500);
-    return () => clearTimeout(timer);
+    const timer = window.setTimeout(
+      () => injectGlobalScript('adsterra-popunder', POPUNDER_URL),
+      4500,
+    );
+    return () => window.clearTimeout(timer);
   }, []);
 
-  if (!ready) return null;
-
-  return (
-    <Script
-      id="adsterra-popunder"
-      src={POPUNDER_URL}
-      strategy="lazyOnload"
-      async
-      onError={() => console.warn('[Adsterra] Popunder script failed to load.')}
-    />
-  );
+  return null;
 }
 
 export function AdsterraSocialBar() {
-  const [ready, setReady] = useState(false);
-
   useEffect(() => {
-    const timer = setTimeout(() => setReady(true), 1200);
-    return () => clearTimeout(timer);
+    const timer = window.setTimeout(
+      () => injectGlobalScript('adsterra-social-bar', SOCIAL_BAR_URL),
+      1200,
+    );
+    return () => window.clearTimeout(timer);
   }, []);
 
-  if (!ready) return null;
-
-  return (
-    <Script
-      id="adsterra-social-bar"
-      src={SOCIAL_BAR_URL}
-      strategy="lazyOnload"
-      async
-      onError={() => console.warn('[Adsterra] Social bar script failed to load.')}
-    />
-  );
+  return null;
 }
 
 let nativeLoaded = false;
