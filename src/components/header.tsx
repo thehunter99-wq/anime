@@ -18,7 +18,8 @@ const navItems = [
 ];
 
 const STANDALONE_LINKS = [
-  { name: 'Web Series', href: '/tv' },
+  { name: 'Indian Movies', href: '/indian-movies' },
+  { name: 'Web Series', href: '/indian-series' },
   { name: 'Status', href: '/diagnostics' },
 ];
 

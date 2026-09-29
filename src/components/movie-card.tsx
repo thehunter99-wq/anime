@@ -7,6 +7,7 @@ import { slugify } from '@/lib/utils';
 import { PlayCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { getTMDBImageUrl } from '@/lib/tmdb';
+import { languageLabel } from '@/lib/languages';
 
 interface MovieCardProps {
   item: Movie;
@@ -41,7 +42,9 @@ export default function MovieCard({ item }: MovieCardProps) {
               <Badge
                 className="absolute right-2 top-2"
               >
-                Movie
+                {item.original_language && languageLabel(item.original_language)
+                  ? languageLabel(item.original_language)
+                  : 'Movie'}
               </Badge>
             </div>
           </Link>

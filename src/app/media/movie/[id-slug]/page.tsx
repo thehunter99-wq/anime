@@ -7,10 +7,11 @@ import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Download, PlayCircle } from 'lucide-react';
+import { PlayCircle } from 'lucide-react';
 import RecommendedMovies from '@/components/recommended-movies';
 import { AdBanner } from '@/components/ads';
 import { getDownloadUrl } from '@/lib/embed';
+import DownloadButtons from '@/components/download-buttons';
 
 type Props = {
   params: Promise<{
@@ -133,16 +134,7 @@ export default async function MovieDetailsPage({ params }: Props) {
                     Play Movie
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="mt-2 w-full">
-                  <a
-                    href={getDownloadUrl('movie', movie.id, 1, 1) ?? '#'}
-                    target="_blank"
-                    rel="noopener noreferrer nofollow"
-                  >
-                    <Download className="mr-2" />
-                    Download HD
-                  </a>
-                </Button>
+                <DownloadButtons directUrl={getDownloadUrl('movie', movie.id, 1, 1)} className="mt-2" />
              </div>
            </div>
           <AdBanner />

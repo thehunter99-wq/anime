@@ -7,7 +7,7 @@ import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Download, PlayCircle } from 'lucide-react';
+import { PlayCircle } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -18,6 +18,7 @@ import { type TVShow } from '@/lib/types';
 import RecommendedTv from '@/components/recommended-tv';
 import { AdBanner } from '@/components/ads';
 import { getDownloadUrl } from '@/lib/embed';
+import DownloadButtons from '@/components/download-buttons';
 
 
 type Props = {
@@ -176,16 +177,7 @@ export default async function TVShowDetailsPage({ params }: Props) {
                 Seasons & Episodes
               </h2>
                <EpisodeSelector show={show} />
-               <Button asChild variant="outline" className="mt-4 w-full">
-                 <a
-                   href={getDownloadUrl('tv', show.id, 1, 1) ?? '#'}
-                   target="_blank"
-                   rel="noopener noreferrer nofollow"
-                 >
-                   <Download className="mr-2 h-4 w-4" />
-                   Download HD
-                 </a>
-               </Button>
+               <DownloadButtons directUrl={getDownloadUrl('tv', show.id, 1, 1)} className="mt-4" />
              </div>
            </div>
           <AdBanner />

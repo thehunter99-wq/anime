@@ -66,6 +66,7 @@ export type Movie = {
   genre_ids: number[];
   genres?: Genre[];
   imdb_id?: string;
+  original_language?: string;
 };
 
 export type Season = {
@@ -93,6 +94,7 @@ export type TVShow = {
   number_of_episodes?: number;
   number_of_seasons?: number;
   seasons?: Season[];
+  original_language?: string;
 };
 
 export type TMDBResponse<T> = {

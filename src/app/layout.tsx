@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
-import { AdBanner } from "@/components/ads";
+import { AdBanner, AdsterraSocialBar, AdsterraPopunder } from "@/components/ads";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -154,6 +154,8 @@ export default function RootLayout({
         </div>
         <Footer />
         <Toaster />
+        <AdsterraSocialBar />
+        <AdsterraPopunder />
       </body>
     </html>
   );

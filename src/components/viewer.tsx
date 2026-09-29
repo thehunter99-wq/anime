@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { type Media } from '@/lib/types';
@@ -11,8 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn, slugify } from '@/lib/utils';
-import { AdBanner } from '@/components/ads';
 import { getEmbedSources, getDownloadUrl, hasDownload } from '@/lib/embed';
+import DownloadButtons from '@/components/download-buttons';
+import NativeBanner from '@/components/native-banner';
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -184,14 +185,6 @@ export default function Viewer({
             />
           </div>
         )}
-        {hasDownload(type) && downloadUrl && (
-          <Button asChild variant="outline" size="sm" className={isManga ? 'bg-white dark:bg-stone-800' : ''}>
-            <a href={downloadUrl} target="_blank" rel="noopener noreferrer nofollow">
-              <Download className="mr-2 h-4 w-4" />
-              Download HD
-            </a>
-          </Button>
-        )}
         </div>
       </header>
 
@@ -232,6 +225,22 @@ export default function Viewer({
         )}
       </main>
 
+      {hasDownload(type) && downloadUrl && (
+        <div className="container mx-auto px-4 pb-3">
+          <DownloadButtons
+            directUrl={downloadUrl}
+            episodeLabel={
+              isTv ? `S${seasonNumber} E${itemNumber}` : isMovie ? undefined : `Episode ${itemNumber}`
+            }
+            isManga={isManga}
+          />
+        </div>
+      )}
+
+      <div className="container mx-auto px-4 pb-3">
+        <NativeBanner delayMs={2500} />
+      </div>
+
       {sources.length > 1 && (
         <div className="container mx-auto flex items-center justify-center gap-2 px-4 pb-2">
           <span className="text-xs text-muted-foreground">Server</span>
@@ -249,12 +258,6 @@ export default function Viewer({
               {source.label}
             </Button>
           ))}
-        </div>
-      )}
-
-      {!isMovie && (
-        <div className="container mx-auto px-4 pb-2">
-          <AdBanner className="w-full overflow-hidden" />
         </div>
       )}
 

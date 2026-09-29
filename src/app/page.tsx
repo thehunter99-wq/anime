@@ -1,6 +1,11 @@
 
 import { fetchFromAniList } from '@/lib/anilist';
-import { fetchFromTMDB } from '@/lib/tmdb';
+import {
+  fetchFromTMDB,
+  fetchIndianMovies,
+  fetchIndianTrendingMovies,
+  fetchIndianWebSeries,
+} from '@/lib/tmdb';
 import type { Media, Movie, TVShow } from '@/lib/types';
 import Header from '@/components/header';
 import MediaCarousel from '@/components/media-carousel';
@@ -34,7 +39,12 @@ export default async function Home({
   let popularMovies: Movie[] = [];
   let trendingTv: TVShow[] = [];
   let popularTv: TVShow[] = [];
-  
+
+  let indianHindiMovies: Movie[] = [];
+  let indianSouthMovies: Movie[] = [];
+  let trendingIndianMovies: Movie[] = [];
+  let hindiWebSeries: TVShow[] = [];
+
   let animeSearchResults: Media[] = [];
   let mangaSearchResults: Media[] = [];
   let movieSearchResults: Movie[] = [];
@@ -42,17 +52,34 @@ export default async function Home({
 
   try {
     if (query) {
-      if (tab === 'anime') {
-        animeSearchResults = await fetchFromAniList({ search: query, type: 'ANIME', sort: ['SEARCH_MATCH'], perPage: 40 });
-      } else if (tab === 'manga') {
-        mangaSearchResults = await fetchFromAniList({ search: query, type: 'MANGA', sort: ['SEARCH_MATCH'], perPage: 40 });
-      } else if (tab === 'movies') {
+      // `tab=all` is the unified search: every provider is queried so movies,
+      // web series, anime and manga all appear on one page.
+      if (tab === 'anime' || tab === 'all') {
+        animeSearchResults = await fetchFromAniList({ search: query, type: 'ANIME', sort: ['SEARCH_MATCH'], perPage: 20 });
+      }
+      if (tab === 'manga' || tab === 'all') {
+        mangaSearchResults = await fetchFromAniList({ search: query, type: 'MANGA', sort: ['SEARCH_MATCH'], perPage: 20 });
+      }
+      if (tab === 'movies' || tab === 'all') {
         movieSearchResults = await fetchFromTMDB('/search/movie', { query });
-      } else if (tab === 'tv') {
+      }
+      if (tab === 'tv' || tab === 'all') {
         tvSearchResults = await fetchFromTMDB('/search/tv', { query });
       }
     } else {
-      [trendingAnime, popularAnime, trendingManga, popularManga, trendingMovies, popularMovies, trendingTv, popularTv] = await Promise.all([
+      // Indian rails are fetched on every tab because they are the primary
+      // discovery surface for the intended audience. Each call is independent
+      // so one failing region filter cannot blank the whole page.
+      [
+        trendingAnime,
+        popularAnime,
+        trendingManga,
+        popularManga,
+        trendingMovies,
+        popularMovies,
+        trendingTv,
+        popularTv,
+      ] = await Promise.all([
         fetchFromAniList({
           type: 'ANIME',
           sort: ['TRENDING_DESC', 'POPULARITY_DESC'],
@@ -78,6 +105,25 @@ export default async function Home({
         fetchFromTMDB('/trending/tv/week'),
         fetchFromTMDB('/tv/popular'),
       ]);
+
+      [
+        trendingIndianMovies,
+        indianHindiMovies,
+        indianSouthMovies,
+        hindiWebSeries,
+      ] = await Promise.all([
+        fetchIndianTrendingMovies(),
+        fetchIndianMovies('hindi'),
+        fetchIndianMovies('tamil'),
+        fetchIndianWebSeries('hindi'),
+      ]);
+
+      // Dedupe the South rail against Hindi so the same title cannot appear twice.
+      const seen = new Set(indianHindiMovies.map((item) => item.id));
+      const southExtras = (await fetchIndianMovies('telugu')).filter(
+        (item) => !seen.has(item.id)
+      );
+      indianSouthMovies = [...indianSouthMovies, ...southExtras].slice(0, 20);
     }
   } catch (error) {
     console.error('Failed to fetch data:', error);
@@ -130,9 +176,16 @@ export default async function Home({
                   {trendingAnime.length > 0 && (
                     <MediaCarousel title="Trending Anime" items={trendingAnime} />
                   )}
-                  {popularAnime.length > 0 && (
-                    <MediaCarousel title="Popular Anime" items={popularAnime} />
-                  )}
+                   {popularAnime.length > 0 && (
+                     <MediaCarousel title="Popular Anime" items={popularAnime} />
+                   )}
+                   <div className="py-2" />
+                   {trendingIndianMovies.length > 0 && (
+                     <MovieCarousel title="Trending Indian Movies" items={trendingIndianMovies} />
+                   )}
+                   {hindiWebSeries.length > 0 && (
+                     <TvCarousel title="Hindi Web Series" items={hindiWebSeries} />
+                   )}
                 </>
               )}
                {tab === 'manga' && (
@@ -147,20 +200,32 @@ export default async function Home({
               )}
               {tab === 'movies' && (
                 <>
+                   {trendingIndianMovies.length > 0 && (
+                    <MovieCarousel title="Trending Indian Movies" items={trendingIndianMovies} />
+                  )}
+                   {indianHindiMovies.length > 0 && (
+                    <MovieCarousel title="Hindi & Bollywood Movies" items={indianHindiMovies} />
+                  )}
+                   {indianSouthMovies.length > 0 && (
+                    <MovieCarousel title="South Indian Movies" items={indianSouthMovies} />
+                  )}
                    {trendingMovies.length > 0 && (
                     <MovieCarousel title="Trending Movies" items={trendingMovies} />
                   )}
-                  {popularMovies.length > 0 && (
+                   {popularMovies.length > 0 && (
                     <MovieCarousel title="Popular Movies" items={popularMovies} />
                   )}
                 </>
               )}
                {tab === 'tv' && (
                 <>
+                   {hindiWebSeries.length > 0 && (
+                    <TvCarousel title="Hindi Web Series" items={hindiWebSeries} />
+                  )}
                    {trendingTv.length > 0 && (
                     <TvCarousel title="Trending TV Shows" items={trendingTv} />
                   )}
-                  {popularTv.length > 0 && (
+                   {popularTv.length > 0 && (
                     <TvCarousel title="Popular TV Shows" items={popularTv} />
                   )}
                 </>

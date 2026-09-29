@@ -8,6 +8,7 @@ import { slugify } from '@/lib/utils';
 import { PlayCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { getTMDBImageUrl } from '@/lib/tmdb';
+import { languageLabel } from '@/lib/languages';
 
 interface TvCardProps {
   item: TVShow;
@@ -42,7 +43,9 @@ export default function TvCard({ item }: TvCardProps) {
               <Badge
                 className="absolute right-2 top-2"
               >
-                TV
+                {item.original_language && languageLabel(item.original_language)
+                  ? languageLabel(item.original_language)
+                  : 'TV'}
               </Badge>
             </div>
           </Link>

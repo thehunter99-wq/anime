@@ -37,6 +37,20 @@ export function getAdsterraKey() {
   return process.env.NEXT_PUBLIC_ADSTERRA_KEY ?? '';
 }
 
+export function getAdsterraSocialBarUrl() {
+  return (
+    process.env.NEXT_PUBLIC_ADSTERRA_SOCIAL_BAR_URL ??
+    'https://pl31576647.profitableratecpmnetwork.com/ac/65/79/ac65794ec051ffa9b7ab68ab5027f1d2.js'
+  );
+}
+
+export function getAdsterraPopunderUrl() {
+  return (
+    process.env.NEXT_PUBLIC_ADSTERRA_POPUNDER_URL ??
+    'https://pl31576876.profitableratecpmnetwork.com/fa/79/81/fa7981af9d98b11f335221786bc8b090.js'
+  );
+}
+
 /**
  * AniList rate-limits bursts, and TMDB occasionally drops concurrent connections.
  * One short-backoff retry turns most of those into a silent success.
@@ -181,18 +195,131 @@ export function checkAdsterra(): CheckResult {
   if (!key) {
     return {
       id: 'adsterra',
-      label: 'Adsterra Ads',
-      detail: 'NEXT_PUBLIC_ADSTERRA_KEY is not set — ad slots render nothing',
+      label: 'Adsterra In-Content Ads',
+      detail: 'NEXT_PUBLIC_ADSTERRA_KEY is not set — inline banner slots render nothing',
       status: 'pending',
-      hint: 'Paste the zone key from adsterra.com dashboard into .env.local.',
+      hint: 'Paste the zone key from adsterra.com dashboard into .env.local. The social bar works without it.',
     };
   }
   return {
     id: 'adsterra',
-    label: 'Adsterra Ads',
+    label: 'Adsterra In-Content Ads',
     detail: `Zone key set — loader will request ssat.pro/cdn/client.js?key=${key.slice(0, 6)}…`,
     status: 'ok',
   };
+}
+
+export function getAdsterraSmartlinkUrl() {
+  return (
+    process.env.NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL ??
+    'https://www.profitableratecpmnetwork.com/ycpdk6c8c?key=1c287bda01e09dd493a8627eae5e8ead'
+  );
+}
+
+export function getAdsterraNativeBannerUrl() {
+  return (
+    process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL ??
+    'https://pl31577360.profitableratecpmnetwork.com/ebab695606cac21b468c0fe20067b7f6/invoke.js'
+  );
+}
+
+async function checkAdsterraScript(
+  url: string,
+  label: string,
+  timing: string,
+  devDisabled = false
+) {
+  try {
+    const response = await timedFetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      },
+    });
+    const id = label.toLowerCase().replace(/\s+/g, '-');
+    if (!response.ok) {
+      return {
+        id,
+        label,
+        detail: `Script responded with HTTP ${response.status}`,
+        status: 'error' as const,
+        value: url.slice(0, 60),
+      };
+    }
+    const body = await response.text();
+    const disabled = devDisabled && process.env.NODE_ENV !== 'production';
+    return {
+      id,
+      label,
+      detail: disabled
+        ? `Script reachable (${body.length} bytes) — but intentionally suppressed on this dev build; it activates on the deployed domain`
+        : `Script reachable (${body.length} bytes) — ${timing}`,
+      status: (disabled ? 'warn' : 'ok') as 'warn' | 'ok',
+      value: url.slice(0, 60),
+    };
+  } catch (error) {
+    return {
+      id: label.toLowerCase().replace(/\s+/g, '-'),
+      label,
+      detail: `Could not load the script — ${describeError(error)}`,
+      status: 'error' as const,
+      value: url.slice(0, 60),
+    };
+  }
+}
+
+export const checkAdsterraSocialBar = () =>
+  checkAdsterraScript(
+    getAdsterraSocialBarUrl(),
+    'Adsterra Social Bar',
+    'loads ~1.2s after each page renders'
+  );
+
+export const checkAdsterraPopunder = () =>
+  checkAdsterraScript(
+    getAdsterraPopunderUrl(),
+    'Adsterra Popunder',
+    'loads ~4.5s after each page renders',
+    true
+  );
+
+export const checkAdsterraNativeBanner = () =>
+  checkAdsterraScript(
+    getAdsterraNativeBannerUrl(),
+    'Adsterra Native Banner',
+    'injected below the video player ~2.5s after load'
+  );
+
+export async function checkAdsterraSmartlink(): Promise<CheckResult> {
+  const url = getAdsterraSmartlinkUrl();
+  try {
+    const response = await timedFetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      },
+    });
+    const body = await response.text();
+    return {
+      id: 'adsterra-smartlink',
+      label: 'Adsterra Smartlink',
+      detail:
+        response.status < 400
+          ? `Reachable (HTTP ${response.status}, ${body.length} bytes) — primary Download button target`
+          : `Responded with HTTP ${response.status} — clicks may not monetise`,
+      status: response.status < 400 ? 'ok' : 'error',
+      value: url.slice(0, 60),
+      hint: 'Used by "Fast HD Download". "Direct Server" bypasses it, so both paths stay usable.',
+    };
+  } catch (error) {
+    return {
+      id: 'adsterra-smartlink',
+      label: 'Adsterra Smartlink',
+      detail: `Could not reach the smartlink — ${describeError(error)}`,
+      status: 'error',
+      value: url.slice(0, 60),
+    };
+  }
 }
 
 export async function checkEmbedHosts(): Promise<CheckResult> {
@@ -234,12 +361,28 @@ export async function checkEmbedHosts(): Promise<CheckResult> {
 }
 
 export async function runAllChecks(): Promise<CheckResult[]> {
-  const [tmdb, anilist, images] = await Promise.all([
-    checkTMDBKey(),
-    checkAniList(),
-    checkTMDBImages(),
-  ]);
-  return [tmdb, anilist, images, checkAdsterra(), await checkEmbedHosts()];
+  const [tmdb, anilist, images, socialBar, popunder, smartlink, nativeBanner, embeds] =
+    await Promise.all([
+      checkTMDBKey(),
+      checkAniList(),
+      checkTMDBImages(),
+      checkAdsterraSocialBar(),
+      checkAdsterraPopunder(),
+      checkAdsterraSmartlink(),
+      checkAdsterraNativeBanner(),
+      checkEmbedHosts(),
+    ]);
+  return [
+    tmdb,
+    anilist,
+    images,
+    checkAdsterra(),
+    socialBar,
+    popunder,
+    smartlink,
+    nativeBanner,
+    embeds,
+  ];
 }
 
 export function summarize(results: CheckResult[]) {
