@@ -54,7 +54,7 @@ export function AdsterraPopunder() {
     <Script
       id="adsterra-popunder"
       src={POPUNDER_URL}
-      strategy="afterInteractive"
+      strategy="lazyOnload"
       async
       onError={() => console.warn('[Adsterra] Popunder script failed to load.')}
     />
@@ -75,9 +75,8 @@ export function AdsterraSocialBar() {
     <Script
       id="adsterra-social-bar"
       src={SOCIAL_BAR_URL}
-      strategy="afterInteractive"
+      strategy="lazyOnload"
       async
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onError={() => console.warn('[Adsterra] Social bar script failed to load.')}
     />
   );
