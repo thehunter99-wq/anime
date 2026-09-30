@@ -1,3 +1,4 @@
+import { GoogleAnalytics } from "@next/third-parties/google";
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
@@ -12,6 +13,14 @@ const nunito = Nunito({
   subsets: ["latin"],
   variable: "--font-nunito",
 });
+
+/**
+ * GA4 measurement ID. Overridable so the property can be swapped without a code
+ * change — set NEXT_PUBLIC_GA_MEASUREMENT_ID in .env.local and in the
+ * deployment provider's env settings.
+ */
+const GA_MEASUREMENT_ID =
+  process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-7S0357K6TW";
 
 export const metadata: Metadata = {
   title: {
@@ -155,6 +164,7 @@ export default function RootLayout({
         </div>
         <Footer />
         <Toaster />
+        <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
         <AdsterraSocialBar />
         <AdsterraPopunder />
       </body>
