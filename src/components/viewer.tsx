@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn, slugify } from '@/lib/utils';
 import { getEmbedSources, getDownloadUrl, hasDownload } from '@/lib/embed';
 import DownloadButtons from '@/components/download-buttons';
-import NativeBanner from '@/components/native-banner';
+
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -236,10 +236,6 @@ export default function Viewer({
           />
         </div>
       )}
-
-      <div className="container mx-auto px-4 pb-3">
-        <NativeBanner delayMs={2500} />
-      </div>
 
       {sources.length > 1 && (
         <div className="container mx-auto flex items-center justify-center gap-2 px-4 pb-2">

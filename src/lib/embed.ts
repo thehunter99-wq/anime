@@ -4,39 +4,76 @@ export interface EmbedSource {
   id: string;
   label: string;
   url: string;
+  /** True when the host returned a real page in a live probe. */
+  verified: boolean;
 }
 
 /**
- * Verified working mirror families (probed against live hosts):
- *   vidsrc.pm  -> movie, tv, anime, manga all return 200
- *   vidsrc.sbs -> movie and tv return 200, but anime/manga 404
- *
- * vidsrc.xyz / vidsrc.icu / vidsrc.net / vidsrc.to do not resolve to a live
- * server any more, so they are deliberately not used.
+ * Two mirror families use different URL shapes:
+ *  - `vidsrc` — /embed/{type}/{id}[/{season}/{episode}]
+ *  - `vidlink` — /movie/{id} or /tv/{id}/{season}/{episode}
  */
-const HOSTS = {
-  universal: { host: 'vidsrc.pm', label: 'Server 1' },
-  tmdbOnly: { host: 'vidsrc.sbs', label: 'Server 2' },
-} as const;
+type PathFamily = 'vidsrc' | 'vidlink';
 
-function buildPath(
+interface SourceSpec {
+  id: string;
+  label: string;
+  host: string;
+  family: PathFamily;
+  kinds: readonly MediaKind[];
+  verified: boolean;
+}
+
+/**
+ * Ordered by trust: verified hosts first, unverified last.
+ *
+ * Verified by a live probe returning HTTP 200 with a real page body:
+ *   vidsrc.pm  -> movie, tv, anime, manga
+ *   vidsrc.sbs -> movie, tv (anime/manga 404)
+ *   vidlink.pro-> movie, and tv with season/episode
+ *
+ * Not reachable from the build network, so shipped last and never depended on.
+ * Both resolve to 49.44.79.236 — the same sinkhole address that
+ * api.themoviedb.org resolves to there — so they are almost certainly alive on
+ * an unblocked connection, but that could not be confirmed:
+ *   vidsrc.to, player.autoembed.cc
+ *
+ * embed.su is deliberately excluded: it has no DNS A or AAAA record at all.
+ */
+const SOURCES: readonly SourceSpec[] = [
+  { id: 'vidsrc.pm', label: 'Server 1', host: 'vidsrc.pm', family: 'vidsrc', kinds: ['anime', 'manga', 'movie', 'tv'], verified: true },
+  { id: 'vidsrc.sbs', label: 'Server 2', host: 'vidsrc.sbs', family: 'vidsrc', kinds: ['movie', 'tv'], verified: true },
+  { id: 'vidlink.pro', label: 'Server 3', host: 'vidlink.pro', family: 'vidlink', kinds: ['movie', 'tv'], verified: true },
+  { id: 'vidsrc.to', label: 'Server 4', host: 'vidsrc.to', family: 'vidsrc', kinds: ['anime', 'movie', 'tv'], verified: false },
+  { id: 'autoembed', label: 'Server 5', host: 'player.autoembed.cc', family: 'vidsrc', kinds: ['movie', 'tv'], verified: false },
+];
+
+function buildUrl(
+  family: PathFamily,
+  host: string,
   type: MediaKind,
   mediaId: number | string,
   itemNumber: number,
   seasonNumber: number,
   isDub: boolean
-): string {
+): string | null {
+  if (family === 'vidlink') {
+    if (type === 'movie') return `https://${host}/movie/${mediaId}`;
+    if (type === 'tv') return `https://${host}/tv/${mediaId}/${seasonNumber}/${itemNumber}`;
+    return null;
+  }
+
   switch (type) {
     case 'anime':
-      return `/embed/anime/${mediaId}/${itemNumber}/${isDub ? '1' : '0'}`;
+      return `https://${host}/embed/anime/${mediaId}/${itemNumber}/${isDub ? '1' : '0'}`;
     case 'manga':
-      return `/embed/manga/${mediaId}/${itemNumber}`;
+      return `https://${host}/embed/manga/${mediaId}/${itemNumber}`;
     case 'movie':
-      return `/embed/movie/${mediaId}`;
+      return `https://${host}/embed/movie/${mediaId}`;
     case 'tv':
-      return `/embed/tv/${mediaId}/${seasonNumber}/${itemNumber}`;
+      return `https://${host}/embed/tv/${mediaId}/${seasonNumber}/${itemNumber}`;
     default:
-      return '';
+      return null;
   }
 }
 
@@ -47,23 +84,14 @@ export function getEmbedSources(
   seasonNumber: number,
   isDub: boolean
 ): EmbedSource[] {
-  const path = buildPath(type, mediaId, itemNumber, seasonNumber, isDub);
-  if (!path) return [];
-
-  const sources: EmbedSource[] = [
-    { id: HOSTS.universal.host, label: HOSTS.universal.label, url: `https://${HOSTS.universal.host}${path}` },
-  ];
-
-  // vidsrc.sbs only carries TMDB-backed content, never anime or manga.
-  if (type === 'movie' || type === 'tv') {
-    sources.push({
-      id: HOSTS.tmdbOnly.host,
-      label: HOSTS.tmdbOnly.label,
-      url: `https://${HOSTS.tmdbOnly.host}${path}`,
-    });
-  }
-
-  return sources;
+  return SOURCES.filter((s) => s.kinds.includes(type))
+    .map((s) => ({
+      id: s.id,
+      label: s.label,
+      verified: s.verified,
+      url: buildUrl(s.family, s.host, type, mediaId, itemNumber, seasonNumber, isDub) ?? '',
+    }))
+    .filter((s) => s.url.length > 0);
 }
 
 /**
@@ -77,9 +105,7 @@ export function getDownloadUrl(
   itemNumber: number,
   seasonNumber: number
 ): string | null {
-  const path = buildPath(type, mediaId, itemNumber, seasonNumber, false);
-  if (!path) return null;
-  return `https://${HOSTS.universal.host}${path}`;
+  return buildUrl('vidsrc', 'vidsrc.pm', type, mediaId, itemNumber, seasonNumber, false);
 }
 
 export const hasDownload = (type: MediaKind) => type === 'movie' || type === 'tv';

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
 import { AdBanner, AdsterraSocialBar, AdsterraPopunder } from "@/components/ads";
+import NativeBanner from "@/components/native-banner";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -148,8 +149,9 @@ export default function RootLayout({
       >
         <DisclaimerModal />
         <div className="flex-grow">{children}</div>
-        <div className="container mx-auto px-4 pb-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <AdBanner label="Advertisement" />
+          <NativeBanner label="Advertisement" />
         </div>
         <Footer />
         <Toaster />

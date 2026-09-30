@@ -1,7 +1,6 @@
 'use client';
 
 import Script from 'next/script';
-import { useEffect, useState } from 'react';
 
 const NATIVE_SCRIPT_URL =
   process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL ??
@@ -12,55 +11,46 @@ const CONTAINER_ID = 'container-ebab695606cac21b468c0fe20067b7f6';
 type NativeBannerProps = {
   className?: string;
   label?: string;
-  /** Delay before rendering, so the banner never competes with the player. */
-  delayMs?: number;
 };
 
 /**
  * Adsterra Native Banner, using the network's official container-plus-script
- * markup.
+ * markup. Rendered once, globally, in the root layout above the footer.
  *
  * The container id is a build-time constant, so the server and client render
- * identical markup. Nothing is emitted during the hydration pass: `ready` is
- * false on the first client render, matching the server, and flips only after
- * `delayMs` has elapsed in a post-hydration effect.
+ * identical markup and there is nothing for React to mismatch on. `next/script`
+ * hoists the actual injection outside the React tree, so React never owns the
+ * script node.
  *
- * Note the container is never cleared and the script is never moved or removed.
- * The loader does `script.parentNode.insertBefore(...)`, so detaching either the
- * container or the script mid-flight is what produces
- * "Cannot read properties of null (reading 'parentNode')".
+ * This component is a singleton. The Adsterra loader binds to the first element
+ * matching CONTAINER_ID, so mounting it twice on one page (for example here and
+ * in the player) would emit a duplicate id and leave the second slot empty.
+ *
+ * The container is never cleared and the script is never moved or removed: the
+ * loader does `script.parentNode.insertBefore(...)`, so detaching either one
+ * mid-flight is what produces "Cannot read properties of null (reading
+ * 'parentNode')".
  */
-export default function NativeBanner({
-  className,
-  label,
-  delayMs = 2500,
-}: NativeBannerProps) {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setReady(true), delayMs);
-    return () => clearTimeout(timer);
-  }, [delayMs]);
-
+export default function NativeBanner({ className, label }: NativeBannerProps) {
   return (
-    <aside
-      aria-label={label ?? 'Advertisement'}
-      className={className ?? 'my-4 w-full overflow-hidden'}
+    <div
+      className={
+        className ??
+        'my-8 flex min-h-[90px] w-full flex-col items-center justify-center px-4'
+      }
     >
-      {ready ? (
-        <>
-          <div id={CONTAINER_ID} className="w-full" suppressHydrationWarning />
-          <Script
-            id="adsterra-native-banner"
-            src={NATIVE_SCRIPT_URL}
-            strategy="afterInteractive"
-            async
-            onError={() =>
-              console.warn('[Adsterra] Native banner script failed to load.')
-            }
-          />
-        </>
-      ) : null}
-    </aside>
+      <aside aria-label={label ?? 'Advertisement'} className="w-full">
+        <div id={CONTAINER_ID} className="w-full" suppressHydrationWarning />
+      </aside>
+      <Script
+        id="adsterra-native-banner"
+        src={NATIVE_SCRIPT_URL}
+        strategy="afterInteractive"
+        async
+        onError={() =>
+          console.warn('[Adsterra] Native banner script failed to load.')
+        }
+      />
+    </div>
   );
 }

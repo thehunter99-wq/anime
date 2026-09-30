@@ -287,7 +287,7 @@ export const checkAdsterraNativeBanner = () =>
   checkAdsterraScript(
     getAdsterraNativeBannerUrl(),
     'Adsterra Native Banner',
-    'injected below the video player ~2.5s after load'
+    'global slot above the footer on every page'
   );
 
 export async function checkAdsterraSmartlink(): Promise<CheckResult> {
@@ -323,11 +323,17 @@ export async function checkAdsterraSmartlink(): Promise<CheckResult> {
 }
 
 export async function checkEmbedHosts(): Promise<CheckResult> {
+  // Only the three hosts verified by a live probe are asserted as failures.
+  // vidsrc.to and player.autoembed.cc resolve to the same sinkhole address as
+  // api.themoviedb.org on networks that block them, so probing them here would
+  // report a false outage rather than a real one.
   const targets = [
     { label: 'movie (vidsrc.pm)', url: 'https://vidsrc.pm/embed/movie/550' },
     { label: 'tv (vidsrc.pm)', url: 'https://vidsrc.pm/embed/tv/1399/1/1' },
     { label: 'anime (vidsrc.pm)', url: 'https://vidsrc.pm/embed/anime/21/1/0' },
     { label: 'movie (vidsrc.sbs)', url: 'https://vidsrc.sbs/embed/movie/550' },
+    { label: 'movie (vidlink.pro)', url: 'https://vidlink.pro/movie/550' },
+    { label: 'tv (vidlink.pro)', url: 'https://vidlink.pro/tv/1399/1/1' },
   ];
 
   const results = await Promise.all(
@@ -356,7 +362,7 @@ export async function checkEmbedHosts(): Promise<CheckResult> {
     hint:
       failures.length > 0
         ? 'A mirror is down. The viewer falls back to the next server automatically.'
-        : 'The player loads in a client-side iframe, so playback still depends on the browser reaching these hosts.',
+        : 'Servers 4 and 5 (vidsrc.to, autoembed) are untested — they resolve to a blocked address on this network.',
   };
 }
 
