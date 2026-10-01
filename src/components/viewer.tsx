@@ -26,11 +26,24 @@ import {
 } from "@/components/ui/select"
 
 
+/**
+ * Grace period before a server that has not settled is swapped automatically.
+ * Long enough that a slow-but-working mirror is not abandoned mid-load, short
+ * enough that a visitor on a dead mirror is not left staring at a blank frame.
+ */
+const WATCHDOG_MS = 4000;
+
 interface ViewerProps {
   media: Media;
   initialItemNumber: number;
   initialSeasonNumber?: number;
   type: 'anime' | 'manga' | 'movie' | 'tv';
+  /**
+   * TMDB id resolved from the AniList title. Anime carries an AniList id, which
+   * no mirror accepts; without this the player would embed an id that always
+   * resolves to the provider's "Video Not Found" page.
+   */
+  tmdbId?: number | null;
 }
 
 /**
@@ -52,6 +65,7 @@ export default function Viewer({
   initialItemNumber,
   initialSeasonNumber = 1,
   type,
+  tmdbId = null,
 }: ViewerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,15 +93,27 @@ export default function Viewer({
   const isMovie = type === 'movie';
   const isTv = type === 'tv';
 
-  const mediaId = (isMovie || isTv) ? media.id : (media.imdb_id || media.id);
+  /**
+   * Movies and series are already TMDB-native. Anime is not: `media.id` is an
+   * AniList id, so it is only usable once `tmdbId` has been resolved. Falling
+   * back to the AniList id here would embed a frame that is guaranteed to show
+   * "Video Not Found", so an unresolved anime gets no id at all and the viewer
+   * renders an explicit unavailable state instead.
+   */
+  const mediaId: number | string | null = (() => {
+    if (isMovie || isTv) return media.id;
+    if (isAnime) return tmdbId ?? media.imdb_id ?? null;
+    return media.imdb_id || media.id;
+  })();
 
   const sources = getEmbedSources(
     type,
-    mediaId,
+    mediaId ?? '',
     itemNumber,
     seasonNumber,
     isDub,
-    audioLang
+    audioLang,
+    { animeAsTmdbId: isAnime && Boolean(tmdbId) }
   );
   const [sourceIndex, setSourceIndex] = useState(0);
   const activeSource = sources[Math.min(sourceIndex, sources.length - 1)];
@@ -95,7 +121,12 @@ export default function Viewer({
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const downloadUrl = getDownloadUrl(type, mediaId, itemNumber, seasonNumber);
+  /** True only while the auto-fallback timer is actually counting down. */
+  const [watchdogArmed, setWatchdogArmed] = useState(false);
+  const downloadUrl = getDownloadUrl(type, mediaId ?? '', itemNumber, seasonNumber);
+
+  /** Nothing embeddable: an anime whose TMDB id could not be resolved. */
+  const unavailable = sources.length === 0;
 
   useEffect(() => {
     setSourceIndex(0);
@@ -104,22 +135,37 @@ export default function Viewer({
   }, [itemNumber, seasonNumber, isDub, audioLang, mediaId, type]);
 
   /**
-   * Watchdog. A cross-origin iframe cannot be introspected, and its onLoad fires
-   * even for a provider's own "not found" page, so a dead mirror looks exactly
-   * like a slow one. The only reliable signal is elapsed time, so if a server
-   * has not settled we advance to the next one automatically instead of leaving
-   * the visitor on a blank player.
+   * Auto-fallback watchdog.
+   *
+   * A cross-origin iframe cannot be introspected, and its onLoad fires even for
+   * a provider's own "not found" page, so a dead mirror is indistinguishable
+   * from a slow one from the outside. The reliable signal is elapsed time, so a
+   * server that has not settled within WATCHDOG_MS is swapped for the next one
+   * automatically rather than leaving the visitor on a blank player.
+   *
+   * A fast onLoad cancels the timer. That is safe for the failure mode that
+   * actually matters here: an unreachable host does not render an error page, it
+   * hangs, so onLoad never fires and the watchdog always fires. A mirror that
+   * answers quickly with its own "not found" page will therefore not trigger an
+   * automatic swap — the server buttons below remain the manual escape hatch.
    */
   useEffect(() => {
-    if (!isLoading || sources.length < 2) return;
+    if (unavailable || loadFailed || sources.length < 2 || !isLoading) {
+      setWatchdogArmed(false);
+      return;
+    }
 
+    setWatchdogArmed(true);
     const timer = window.setTimeout(() => {
       setSourceIndex((i) => (i < sources.length - 1 ? i + 1 : i));
       if (sourceIndex >= sources.length - 1) setLoadFailed(true);
-    }, 12000);
+    }, WATCHDOG_MS);
 
-    return () => window.clearTimeout(timer);
-  }, [isLoading, iframeSrc, sources.length, sourceIndex]);
+    return () => {
+      window.clearTimeout(timer);
+      setWatchdogArmed(false);
+    };
+  }, [isLoading, iframeSrc, sources.length, sourceIndex, unavailable, loadFailed]);
 
   const title = media.title.english || media.title.romaji;
 
@@ -268,12 +314,24 @@ export default function Viewer({
       </header>
 
       <main className={cn('flex flex-1 items-center justify-center overflow-hidden', isManga ? '' : 'bg-black')}>
-        {isLoading && (
+        {unavailable && (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              This title could not be matched to a streamable catalogue id, so
+              there is nothing to play yet.
+            </p>
+            <p className="max-w-md text-xs text-muted-foreground">
+              Use the report option below to request it — it gets added once the
+              catalogue has it.
+            </p>
+          </div>
+        )}
+        {!unavailable && isLoading && (
            <div className="flex h-full w-full items-center justify-center">
              <Loader2 className="h-8 w-8 animate-spin text-primary" />
            </div>
         )}
-        {loadFailed && (
+        {!unavailable && loadFailed && (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-sm text-muted-foreground">
               Every server failed to load this title. It may not be catalogued yet —
@@ -284,7 +342,7 @@ export default function Viewer({
             </Button>
           </div>
         )}
-        {iframeSrc && !loadFailed && (
+        {!unavailable && iframeSrc && !loadFailed && (
           <iframe
             key={iframeSrc}
             src={iframeSrc}
@@ -314,6 +372,20 @@ export default function Viewer({
             }
             isManga={isManga}
           />
+        </div>
+      )}
+
+      {/* Auto-optimisation status: shown only while a watchdog is actually armed. */}
+      {!unavailable && !loadFailed && watchdogArmed && (
+        <div className="container mx-auto px-4 pb-2">
+          <p
+            className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+            Auto-Optimizing Stream… Switching server if needed
+          </p>
         </div>
       )}
 

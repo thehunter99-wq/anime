@@ -196,3 +196,118 @@ export async function fetchTVShowById(id: number): Promise<TVShow | null> {
     }
     return null;
 }
+
+/**
+ * TMDB keyword id for "anime". Used as a soft signal; TMDB filters this keyword
+ * inconsistently on /search/tv, so it narrows results but never gates them.
+ */
+const ANIME_KEYWORD_ID = 210024;
+
+/**
+ * AniList ids are not TMDB ids, and TMDB has no external-id route that accepts
+ * an AniList or MyAnimeList id. The only reliable bridge is the title, resolved
+ * against TMDB's TV catalogue and then confirmed to actually be anime.
+ *
+ * Returning null is normal and expected (TMDB simply does not carry every
+ * series, and TMDB is unreachable on some networks). Callers must degrade to a
+ * non-video state rather than embed a guessed id — a wrong id renders the
+ * provider's "Video Not Found" page inside the player.
+ */
+const animeIdCache = new Map<string, number | null>();
+
+function normalizeTitle(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\b(tv|anime|series)\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Confidence that a TMDB result is the same show as the AniList entry.
+ * Exact and near-exact matches are trusted; anything looser is rejected rather
+ * than risking a wrong-but-playable title.
+ */
+function titleScore(query: string, ...candidates: Array<string | null | undefined>): number {
+    const target = normalizeTitle(query);
+    if (!target) return 0;
+
+    let best = 0;
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        const value = normalizeTitle(candidate);
+        if (!value) continue;
+        if (value === target) return 100;
+        if (value.startsWith(target) || target.startsWith(value)) best = Math.max(best, 85);
+        else if (value.includes(target) || target.includes(value)) best = Math.max(best, 65);
+
+        // Token overlap catches transliteration and punctuation drift.
+        const targetTokens = target.split(' ').filter((t) => t.length > 2);
+        const valueTokens = new Set(value.split(' '));
+        if (targetTokens.length > 0) {
+            const overlap = targetTokens.filter((t) => valueTokens.has(t)).length;
+            const ratio = overlap / targetTokens.length;
+            if (ratio === 1) best = Math.max(best, 80);
+            else if (ratio >= 0.5) best = Math.max(best, 45);
+        }
+    }
+    return best;
+}
+
+/** Accept only confident matches; a wrong id is worse than no id. */
+const ANIME_MATCH_THRESHOLD = 60;
+
+export async function resolveAnimeTmdbId(
+    ...titles: Array<string | null | undefined>
+): Promise<number | null> {
+    // AniList frequently returns the same string for both romaji and english,
+    // so dedupe before issuing a request for each.
+    const queries = Array.from(
+        new Set(
+            titles
+                .filter((t): t is string => Boolean(t && t.trim()))
+                .map((t) => t.trim())
+        )
+    );
+    if (queries.length === 0) return null;
+
+    const cacheKey = queries.map(normalizeTitle).join('|');
+    if (animeIdCache.has(cacheKey)) return animeIdCache.get(cacheKey) ?? null;
+
+    let resolved: number | null = null;
+
+    try {
+        // Romaji first: TMDB's original_name for anime is usually the romaji
+        // form, so it matches far better than the English marketing title.
+        for (const query of queries) {
+            const items = (await fetchFromTMDB('/search/tv', {
+                query,
+                with_original_language: 'ja',
+                include_adult: 'false',
+            })) as Array<Record<string, unknown>>;
+
+            const candidate = items
+                .filter((item) => item.original_language === 'ja')
+                .map((item) => ({
+                    id: item.id as number,
+                    score: titleScore(query, item.name as string, item.original_name as string),
+                }))
+                .filter((item) => item.score >= ANIME_MATCH_THRESHOLD)
+                .sort((a, b) => b.score - a.score)[0];
+
+            if (candidate) {
+                resolved = candidate.id;
+                break;
+            }
+        }
+    } catch {
+        // Network failures are already logged by tmdbFetch; stay silent here so
+        // a missing mapping never breaks the page render.
+        resolved = null;
+    }
+
+    animeIdCache.set(cacheKey, resolved);
+    return resolved;
+}

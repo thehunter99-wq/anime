@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
 import { fetchMediaById } from '@/lib/anilist';
+import { resolveAnimeTmdbId } from '@/lib/tmdb';
+import { resolveAnimeIds } from '@/lib/anime-mapping';
 import type { Metadata } from 'next';
 import { slugify } from '@/lib/utils';
 import { toEpisode } from '@/lib/params';
@@ -63,6 +65,18 @@ export default async function ViewPage({ params, searchParams }: Props) {
     notFound();
   }
 
+  // Manga is read, not streamed, so it needs no id mapping. Anime does: the
+  // AniList id is meaningless to the mirrors, so it is mapped to a TMDB id on
+  // the server. AniZip is authoritative and, unlike TMDB, is reachable on
+  // networks that block api.themoviedb.org; the TMDB title search is only a
+  // fallback for titles AniZip does not carry. Null is a normal result and the
+  // viewer then renders an unavailable state rather than a broken embed.
+  const tmdbId =
+    type === 'anime'
+      ? (await resolveAnimeIds(id))?.tmdbId ??
+        (await resolveAnimeTmdbId(media.title.romaji, media.title.english))
+      : null;
+
   const expectedSlug = slugify(media.title.english || media.title.romaji);
   const actualSlug = idSlug.substring(id.toString().length + 1);
 
@@ -75,7 +89,12 @@ export default async function ViewPage({ params, searchParams }: Props) {
   return (
     <>
       <JsonLd media={media} type={type} itemNumber={initialItemNumber} />
-      <Viewer media={media} initialItemNumber={initialItemNumber} type={type} />
+      <Viewer
+        media={media}
+        initialItemNumber={initialItemNumber}
+        type={type}
+        tmdbId={tmdbId}
+      />
     </>
   );
 }
