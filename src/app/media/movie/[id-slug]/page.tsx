@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { fetchMovieById, getTMDBImageUrl } from '@/lib/tmdb';
 import { type Metadata } from 'next';
 import { slugify } from '@/lib/utils';
+import { buildMediaMetadata } from '@/lib/metadata';
 import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -34,20 +35,15 @@ export async function generateMetadata(
     return { title: 'Not Found' };
   }
 
-  const title = movie.title;
-  const description = movie.overview || 'No description available.';
   const imageUrl = getTMDBImageUrl(movie.backdrop_path || movie.poster_path, 'original');
 
-  return {
-    title: title,
-    description: description,
-    openGraph: {
-      title: title,
-      description: description,
-      images: imageUrl ? [imageUrl] : [],
-      type: 'video.movie',
-    },
-  };
+  return buildMediaMetadata({
+    title: movie.title,
+    description: movie.overview,
+    image: imageUrl,
+    path: `/media/movie/${movie.id}-${slugify(movie.title)}`,
+    ogType: 'video.movie',
+  });
 }
 
 export default async function MovieDetailsPage({ params }: Props) {

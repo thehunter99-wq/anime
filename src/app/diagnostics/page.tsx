@@ -1,4 +1,5 @@
 import { runAllChecks, summarize, type CheckResult } from '@/lib/health';
+import { SITE_NAME } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export default async function DiagnosticsPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-10 sm:px-6">
       <header className="mb-8 space-y-2">
-        <p className="text-sm text-muted-foreground">AniMovie</p>
+        <p className="text-sm text-muted-foreground">{SITE_NAME}</p>
         <h1 className="text-3xl font-bold">System Status</h1>
         <p className="text-sm text-muted-foreground">
           Live check of every external integration. Refresh to re-run.

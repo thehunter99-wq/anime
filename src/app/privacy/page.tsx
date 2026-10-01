@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SITE_NAME } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'Privacy Policy for AniMovie. We value your privacy.',
+  description: 'Privacy Policy for {SITE_NAME}. We value your privacy.',
   robots: {
     index: false,
     follow: false,

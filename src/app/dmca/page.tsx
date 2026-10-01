@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SITE_NAME } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'DMCA Notice & Takedown Policy',
-  description: 'DMCA Notice & Takedown Policy for AniMovie. How to file a copyright infringement notice.',
+  description: 'DMCA Notice & Takedown Policy for {SITE_NAME}. How to file a copyright infringement notice.',
   robots: {
     index: false,
     follow: false,

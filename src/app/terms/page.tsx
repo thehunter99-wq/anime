@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SITE_NAME } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Terms of Use',
-  description: 'Terms of Use for AniMovie. By accessing this website, you agree to these terms.',
+  description: 'Terms of Use for {SITE_NAME}. By accessing this website, you agree to these terms.',
   robots: {
     index: false,
     follow: false,

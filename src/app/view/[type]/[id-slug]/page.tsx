@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { fetchMediaById } from '@/lib/anilist';
 import type { Metadata } from 'next';
 import { slugify } from '@/lib/utils';
+import { toEpisode } from '@/lib/params';
+import { buildMediaMetadata } from '@/lib/metadata';
 import JsonLd from '@/components/json-ld';
 import Viewer from '@/components/viewer';
 
@@ -34,28 +36,25 @@ export async function generateMetadata(
   const itemType = isAnime ? 'Episode' : 'Chapter';
   const itemNumber = resolvedSearchParams?.item || '1';
 
-  return {
-    title: `${isAnime ? 'Watch' : 'Read'} ${title} ${itemType} ${itemNumber}`,
-    description: `Stream ${itemType.toLowerCase()} ${itemNumber} of the ${isAnime ? 'anime series' : 'manga'} ${title} in high quality. Available in Sub and Dub.`,
-    openGraph: {
-      title: `${isAnime ? 'Watch' : 'Read'} ${title} ${itemType} ${itemNumber}`,
-      description: `Stream ${itemType.toLowerCase()} ${itemNumber} of the ${isAnime ? 'anime series' : 'manga'} ${title} in high quality.`,
-      images: [media.coverImage.extraLarge].filter(Boolean) as string[],
-      type: isAnime ? 'video.episode' : 'article',
-    },
-  };
+  return buildMediaMetadata({
+    title,
+    description: media.description ?? `Stream in high quality. Available in Sub and Dub.`,
+    image: media.bannerImage ?? media.coverImage.extraLarge,
+    path: `/view/${type}/${media.id}-${slugify(title)}${
+      itemNumber !== '1' ? `?item=${itemNumber}` : ''
+    }`,
+    ogType: isAnime ? 'video.episode' : 'video.other',
+    episodeLabel: `${itemType} ${toEpisode(resolvedSearchParams?.item)}`,
+  });
 }
 
 export default async function ViewPage({ params, searchParams }: Props) {
   const { 'id-slug': idSlug, type } = await params;
   const resolvedSearchParams = await searchParams;
   const id = parseInt(idSlug.split('-')[0], 10);
-  const itemNumberParam = resolvedSearchParams?.item;
-  const initialItemNumber = Array.isArray(itemNumberParam)
-    ? parseInt(itemNumberParam[0], 10)
-    : parseInt(itemNumberParam || '1', 10);
+  const initialItemNumber = toEpisode(resolvedSearchParams?.item);
 
-  if (isNaN(id) || !['anime', 'manga'].includes(type) || isNaN(initialItemNumber)) {
+  if (isNaN(id) || !['anime', 'manga'].includes(type)) {
     notFound();
   }
 

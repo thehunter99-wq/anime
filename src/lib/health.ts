@@ -52,19 +52,24 @@ export function getAdsterraPopunderUrl() {
 }
 
 /**
- * AniList rate-limits bursts, and TMDB occasionally drops concurrent connections.
- * One short-backoff retry turns most of those into a silent success.
+ * One short-backoff retry turns most transient failures into a silent success.
+ *
+ * `timeoutMs` is per-attempt, so the worst case for a caller is
+ * `attempts * timeoutMs + backoff`. Hosts that are known to be slow or blocked
+ * (TMDB on restricted networks) pass a tighter budget so a render never waits
+ * on them.
  */
 export async function fetchWithRetry(
   input: string,
   init: RequestInit = {},
   attempts = 2,
-  backoffMs = 400
+  backoffMs = 400,
+  timeoutMs = FETCH_TIMEOUT_MS
 ): Promise<Response> {
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      const response = await timedFetch(input, init);
+      const response = await timedFetch(input, init, timeoutMs);
       if (response.status !== 429 && response.status < 500) return response;
       lastError = new Error(`HTTP ${response.status}`);
     } catch (error) {
@@ -334,6 +339,8 @@ export async function checkEmbedHosts(): Promise<CheckResult> {
     { label: 'movie (vidsrc.sbs)', url: 'https://vidsrc.sbs/embed/movie/550' },
     { label: 'movie (vidlink.pro)', url: 'https://vidlink.pro/movie/550' },
     { label: 'tv (vidlink.pro)', url: 'https://vidlink.pro/tv/1399/1/1' },
+    { label: 'movie (2embed)', url: 'https://www.2embed.cc/embed/550' },
+    { label: 'tv (2embed)', url: 'https://www.2embed.cc/embedtv/1399&s=1&e=1' },
   ];
 
   const results = await Promise.all(
@@ -362,7 +369,7 @@ export async function checkEmbedHosts(): Promise<CheckResult> {
     hint:
       failures.length > 0
         ? 'A mirror is down. The viewer falls back to the next server automatically.'
-        : 'Servers 4 and 5 (vidsrc.to, autoembed) are untested — they resolve to a blocked address on this network.',
+        : 'Anime currently resolves through vidsrc.pm only — every dedicated anime mirror probed dead.',
   };
 }
 

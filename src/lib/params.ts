@@ -1,0 +1,33 @@
+/**
+ * Query-string coercion for player routing.
+ *
+ * `parseInt` returns NaN for junk input, and `parseInt('0')` returns 0. Both
+ * values flow straight into embed URLs (`/embed/tv/{id}/NaN/NaN`), which is how
+ * a "Video Not Found" 404 happens. Every player number therefore goes through
+ * here, so a malformed link degrades to episode 1 instead of a broken player.
+ */
+export function toPositiveInt(
+  value: string | string[] | null | undefined,
+  fallback = 1,
+  max?: number
+): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  // `??` then an explicit empty-string check: '0' and 'abc' must not become the
+  // fallback silently for genuinely valid-but-zero input, but junk must.
+  if (raw === null || raw === undefined || raw === '') return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+
+  if (max !== undefined && parsed > max) return max;
+  return parsed;
+}
+
+/** Season is 1-based for every provider this project supports. */
+export const toSeason = (value: string | string[] | null | undefined, max?: number) =>
+  toPositiveInt(value, 1, max);
+
+/** Episode is 1-based. */
+export const toEpisode = (value: string | string[] | null | undefined, max?: number) =>
+  toPositiveInt(value, 1, max);

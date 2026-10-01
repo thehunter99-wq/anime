@@ -1,4 +1,5 @@
 import { GoogleAnalytics } from "@next/third-parties/google";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
@@ -22,13 +23,41 @@ const nunito = Nunito({
 const GA_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-7S0357K6TW";
 
+const SITE_DESCRIPTION =
+  "Your one-stop platform for streaming the latest anime, reading popular manga, and watching movies. All for free, with sub and dub options available.";
+
+/**
+ * Fallback share image for routes that do not provide their own artwork
+ * (homepage, Indian rails, static pages). Media view pages override this via
+ * buildMediaMetadata with a real 1280x720 poster.
+ */
+const DEFAULT_OG_IMAGE = {
+  url: `${SITE_URL}/og-default.png`,
+  width: 1200,
+  height: 630,
+  alt: `${SITE_NAME} - Watch Anime, Manga & Movies Online`,
+};
+
 export const metadata: Metadata = {
   title: {
-    template: "%s | AniMovie",
-    default: "AniMovie - Watch Anime, Manga & Movies Online",
+    template: `%s | ${SITE_NAME}`,
+    default: `${SITE_NAME} - Watch Anime, Manga & Movies Online`,
   },
-  description:
-    "Your one-stop platform for streaming the latest anime, reading popular manga, and watching movies. All for free, with sub and dub options available.",
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} - Watch Anime, Manga & Movies Online`,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    images: [DEFAULT_OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} - Watch Anime, Manga & Movies Online`,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE.url],
+  },
   other: {
     // Rendered by Next into <head> itself. Using an explicit <head> tag in an
     // App Router root layout fights the router's own head management and is a
@@ -36,8 +65,8 @@ export const metadata: Metadata = {
     "script:ld+json": JSON.stringify({
       "@context": "https://schema.org",
       "@type": "WebApplication",
-      name: "Animovie",
-      url: "https://animovie.parthakashyap.com",
+      name: SITE_NAME,
+      url: SITE_URL,
       creator: {
         "@type": "Person",
         "@id": "https://parthakashyap.com/#person",
@@ -67,10 +96,10 @@ function Footer() {
       <div className="container mx-auto flex flex-col gap-6 px-4 py-8 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col items-center gap-2 text-center md:items-start md:text-left">
           <p>
-            &copy; {new Date().getFullYear()} AniMovie. All Rights Reserved.
+            &copy; {new Date().getFullYear()} {SITE_NAME}. All Rights Reserved.
           </p>
           <p className="max-w-md text-xs">
-            All media content is provided by third-party services. AniMovie does
+            All media content is provided by third-party services. {SITE_NAME} does
             not claim ownership of any anime, movies, TV shows, or manga linked
             or embedded on this site.
           </p>

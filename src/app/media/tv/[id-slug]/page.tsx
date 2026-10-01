@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { fetchTVShowById, getTMDBImageUrl } from '@/lib/tmdb';
 import { type Metadata } from 'next';
 import { slugify } from '@/lib/utils';
+import { buildMediaMetadata } from '@/lib/metadata';
 import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -42,20 +43,15 @@ export async function generateMetadata(
     return { title: 'Not Found' };
   }
 
-  const title = show.name;
-  const description = show.overview || 'No description available.';
   const imageUrl = getTMDBImageUrl(show.backdrop_path || show.poster_path, 'original');
 
-  return {
-    title: title,
-    description: description,
-    openGraph: {
-      title: title,
-      description: description,
-      images: imageUrl ? [imageUrl] : [],
-      type: 'video.tv_show',
-    },
-  };
+  return buildMediaMetadata({
+    title: show.name,
+    description: show.overview,
+    image: imageUrl,
+    path: `/media/tv/${show.id}-${slugify(show.name)}`,
+    ogType: 'video.episode',
+  });
 }
 
 

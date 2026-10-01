@@ -22,24 +22,68 @@ export function getTMDBImageUrl(path: string | null, size: 'w500' | 'original' =
   return `${TMDB_IMAGE_BASE_URL}${size}${path}`;
 }
 
+/**
+ * TMDB is unreachable on some networks (blocked DNS, sinkholed IP, firewall).
+ *
+ * Without a tight budget every rail pays the full retry timeout, so one page
+ * render stalls for well over a minute across a dozen sequential calls. Two
+ * guards prevent that:
+ *
+ *  1. Each call is capped at 3s per attempt and fails fast to empty results.
+ *  2. A breaker stops probing entirely once the host looks unreachable, so the
+ *     remaining rails on the same render return instantly. It resets on the
+ *     next successful call, and a dev-server restart re-probes.
+ *
+ * Deliberately not tripped by HTTP error statuses: a 401 or 404 means TMDB
+ * answered, which is fast and does not warrant blocking later calls.
+ */
+const TMDB_TIMEOUT_MS = 3000;
+const TMDB_ATTEMPTS = 2;
+const TMDB_BACKOFF_MS = 300;
+const TMDB_BREAKER_THRESHOLD = 3;
+
+let consecutiveTransportFailures = 0;
+let breakerTripped = false;
+let hasWarnedBreaker = false;
+
 async function tmdbFetch(endpoint: string, params: Record<string, string> = {}) {
     if (!TMDB_API_KEY) {
         warnMissingKey();
         return { results: [] };
     }
+
+    // Host already proven unreachable on this process; skip straight to fallback.
+    if (breakerTripped) return { results: [] };
+
     const url = new URL(`${TMDB_API_URL}${endpoint}`);
     url.searchParams.append('api_key', TMDB_API_KEY);
     Object.entries(params).forEach(([key, value]) => url.searchParams.append(key, value));
 
     try {
-        const response = await fetchWithRetry(url.toString());
+        const response = await fetchWithRetry(
+            url.toString(),
+            {},
+            TMDB_ATTEMPTS,
+            TMDB_BACKOFF_MS,
+            TMDB_TIMEOUT_MS
+        );
         if (!response.ok) {
             console.warn(`[TMDB] ${endpoint} failed with HTTP ${response.status}`);
             return { results: [] };
         }
+        consecutiveTransportFailures = 0;
         return await response.json();
     } catch {
-        console.warn(`[TMDB] ${endpoint} unreachable. Check /diagnostics for network status.`);
+        consecutiveTransportFailures += 1;
+        if (consecutiveTransportFailures >= TMDB_BREAKER_THRESHOLD && !breakerTripped) {
+            breakerTripped = true;
+            if (!hasWarnedBreaker) {
+                hasWarnedBreaker = true;
+                console.warn(
+                    '[TMDB] Host unreachable — pausing TMDB calls for this server process and serving fallback rails. Restart the dev server to retry.'
+                );
+            }
+        }
         return { results: [] };
     }
 }

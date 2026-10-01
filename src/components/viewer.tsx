@@ -15,6 +15,8 @@ import { getEmbedSources, getDownloadUrl, hasDownload } from '@/lib/embed';
 import DownloadButtons from '@/components/download-buttons';
 
 import { useToast } from '@/hooks/use-toast';
+import { saveProgress } from '@/lib/progress-store';
+import ReportRequestBar from '@/components/report-request-bar';
 import {
   Select,
   SelectContent,
@@ -31,6 +33,20 @@ interface ViewerProps {
   type: 'anime' | 'manga' | 'movie' | 'tv';
 }
 
+/**
+ * Audio options offered above the player.
+ *
+ * `dub` drives the explicit dub flag in the vidsrc anime path, which is the one
+ * audio switch that is actually enforced by the provider. `lang` is forwarded to
+ * the mirror as a hint (ds_lang / multiLang); whether a given title actually
+ * carries a Hindi or English audio track is decided by the mirror, not by us.
+ */
+const LANGUAGE_OPTIONS = [
+  { id: 'multi', label: 'Hindi Dubbed', hint: 'Multi-audio', lang: 'hi', dub: true },
+  { id: 'sub', label: 'English', hint: 'Subbed', lang: 'en', dub: false },
+  { id: 'multi-en', label: 'Multi-Audio', hint: 'All languages', lang: undefined, dub: undefined },
+] as const;
+
 export default function Viewer({
   media,
   initialItemNumber,
@@ -41,10 +57,23 @@ export default function Viewer({
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [itemNumber, setItemNumber] = useState(initialItemNumber);
-  const [seasonNumber, setSeasonNumber] = useState(initialSeasonNumber);
+  // Clamped on read as well as on parse: a prop can arrive as NaN, and NaN in
+  // an embed URL is exactly what produces a "Video Not Found" page.
+  const [itemNumber, setItemNumber] = useState(
+    Number.isFinite(initialItemNumber) && initialItemNumber >= 1
+      ? initialItemNumber
+      : 1
+  );
+  const [seasonNumber, setSeasonNumber] = useState(
+    Number.isFinite(initialSeasonNumber) && initialSeasonNumber >= 1
+      ? initialSeasonNumber
+      : 1
+  );
   const [isDub, setIsDub] = useState(searchParams.get('dub') === '1');
-  
+  const [audioLang, setAudioLang] = useState<string | undefined>(
+    searchParams.get('lang') ?? undefined
+  );
+
   const isAnime = type === 'anime';
   const isManga = type === 'manga';
   const isMovie = type === 'movie';
@@ -52,7 +81,14 @@ export default function Viewer({
 
   const mediaId = (isMovie || isTv) ? media.id : (media.imdb_id || media.id);
 
-  const sources = getEmbedSources(type, mediaId, itemNumber, seasonNumber, isDub);
+  const sources = getEmbedSources(
+    type,
+    mediaId,
+    itemNumber,
+    seasonNumber,
+    isDub,
+    audioLang
+  );
   const [sourceIndex, setSourceIndex] = useState(0);
   const activeSource = sources[Math.min(sourceIndex, sources.length - 1)];
   const iframeSrc = activeSource?.url ?? '';
@@ -64,19 +100,62 @@ export default function Viewer({
   useEffect(() => {
     setSourceIndex(0);
     setLoadFailed(false);
-  }, [itemNumber, seasonNumber, isDub, mediaId, type]);
+    setIsLoading(true);
+  }, [itemNumber, seasonNumber, isDub, audioLang, mediaId, type]);
 
-  const tryNextServer = () => {
-    if (sourceIndex < sources.length - 1) {
-      setSourceIndex((i) => i + 1);
-      setIsLoading(true);
-      setLoadFailed(false);
-    } else {
-      setLoadFailed(true);
-    }
-  };
+  /**
+   * Watchdog. A cross-origin iframe cannot be introspected, and its onLoad fires
+   * even for a provider's own "not found" page, so a dead mirror looks exactly
+   * like a slow one. The only reliable signal is elapsed time, so if a server
+   * has not settled we advance to the next one automatically instead of leaving
+   * the visitor on a blank player.
+   */
+  useEffect(() => {
+    if (!isLoading || sources.length < 2) return;
+
+    const timer = window.setTimeout(() => {
+      setSourceIndex((i) => (i < sources.length - 1 ? i + 1 : i));
+      if (sourceIndex >= sources.length - 1) setLoadFailed(true);
+    }, 12000);
+
+    return () => window.clearTimeout(timer);
+  }, [isLoading, iframeSrc, sources.length, sourceIndex]);
 
   const title = media.title.english || media.title.romaji;
+
+  /**
+   * Record progress so the homepage can offer "Continue Watching". Written on
+   * every episode/season change rather than on a timer, which is accurate enough
+   * for resume purposes and costs one localStorage write per navigation.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams();
+    if (isTv) {
+      params.set('season', String(seasonNumber));
+      params.set('episode', String(itemNumber));
+    } else {
+      params.set('item', String(itemNumber));
+    }
+
+    const query = params.toString();
+    const posterPath =
+      media.coverImage?.large?.split('/').pop() ?? null;
+
+    saveProgress({
+      id: String(media.id),
+      type,
+      title,
+      posterPath,
+      season: seasonNumber,
+      episode: itemNumber,
+      timestamp: Date.now(),
+      href: `/view/${type}/${media.id}-${slugify(title)}${
+        query ? `?${query}` : ''
+      }`,
+    });
+  }, [media.id, type, title, itemNumber, seasonNumber, isTv, media.coverImage?.large]);
   
   const totalItems = isAnime ? media.episodes : (isTv ? (media.seasons?.find(s => s.season_number === seasonNumber)?.episode_count) : media.chapters);
 
@@ -197,10 +276,11 @@ export default function Viewer({
         {loadFailed && (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-sm text-muted-foreground">
-              This server did not respond. Try another server or reload.
+              Every server failed to load this title. It may not be catalogued yet —
+              try the download options below.
             </p>
-            <Button onClick={tryNextServer} variant="secondary">
-              Switch server
+            <Button onClick={() => { setSourceIndex(0); setLoadFailed(false); setIsLoading(true); }} variant="secondary">
+              Retry Server 1
             </Button>
           </div>
         )}
@@ -237,23 +317,73 @@ export default function Viewer({
         </div>
       )}
 
-      {sources.length > 1 && (
-        <div className="container mx-auto flex items-center justify-center gap-2 px-4 pb-2">
-          <span className="text-xs text-muted-foreground">Server</span>
-          {sources.map((source, index) => (
-            <Button
-              key={source.id}
-              size="sm"
-              variant={index === sourceIndex ? 'default' : 'secondary'}
-              onClick={() => {
-                setSourceIndex(index);
-                setIsLoading(true);
-                setLoadFailed(false);
-              }}
-            >
-              {source.label}
-            </Button>
-          ))}
+      {!isManga && (
+        <ReportRequestBar
+          title={title}
+          episodeLabel={
+            isTv
+              ? `S${seasonNumber} E${itemNumber}`
+              : isMovie
+                ? undefined
+                : `Episode ${itemNumber}`
+          }
+        />
+      )}
+
+      {sources.length > 0 && (
+        <div className="container mx-auto flex flex-col items-center gap-2 px-4 pb-2">
+          {!isManga && (
+            <div className="flex w-full flex-col items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Audio / Language</span>
+              <div className="flex w-full flex-wrap items-center justify-center gap-2">
+                {LANGUAGE_OPTIONS.map((option) => (
+                  <Button
+                    key={option.id}
+                    size="sm"
+                    variant={audioLang === option.lang ? 'default' : 'secondary'}
+                    aria-pressed={audioLang === option.lang}
+                    onClick={() => {
+                      setAudioLang(option.lang);
+                      if (option.dub !== undefined) setIsDub(option.dub);
+                    }}
+                    className="h-auto min-w-0 flex-col gap-0 px-3 py-1.5"
+                  >
+                    <span className="text-xs font-semibold">{option.label}</span>
+                    <span className="text-[10px] font-normal opacity-80">
+                      {option.hint}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {sources.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              Video not loading? Pick another server — each is an independent mirror.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="text-xs text-muted-foreground">Server</span>
+            {sources.map((source, index) => (
+              <Button
+                key={source.id}
+                size="sm"
+                variant={index === sourceIndex ? 'default' : 'secondary'}
+                aria-current={index === sourceIndex ? 'true' : undefined}
+                onClick={() => {
+                  setSourceIndex(index);
+                  setIsLoading(true);
+                  setLoadFailed(false);
+                }}
+              >
+                {source.label}
+                <span className="ml-1.5 text-[10px] uppercase opacity-80">
+                  {source.quality}
+                </span>
+              </Button>
+            ))}
+          </div>
         </div>
       )}
 

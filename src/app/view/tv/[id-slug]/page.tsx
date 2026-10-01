@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { fetchTVShowById, getTMDBImageUrl } from '@/lib/tmdb';
 import type { Metadata } from 'next';
 import { slugify } from '@/lib/utils';
+import { toEpisode, toSeason } from '@/lib/params';
 import Viewer from '@/components/viewer';
 
 type Props = {
@@ -86,11 +87,11 @@ export default async function ViewPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <Viewer 
-        media={viewerMedia as any} 
-        initialItemNumber={parseInt(Array.isArray(episode) ? episode[0] : episode, 10)} 
-        initialSeasonNumber={parseInt(Array.isArray(season) ? season[0] : season, 10)}
-        type={'tv'} 
+      <Viewer
+        media={viewerMedia as any}
+        initialItemNumber={toEpisode(episode)}
+        initialSeasonNumber={toSeason(season)}
+        type={'tv'}
       />
     </>
   );
