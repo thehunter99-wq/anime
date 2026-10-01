@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { fetchMovieById, getTMDBImageUrl } from '@/lib/tmdb';
 import type { Metadata } from 'next';
 import { slugify } from '@/lib/utils';
+import { titleFromSlug } from '@/lib/params';
 import Viewer from '@/components/viewer';
 
 type Props = {
@@ -23,13 +24,14 @@ export async function generateMetadata(
   }
 
   const movie = await fetchMovieById(id);
-  if (!movie) {
-    return { title: 'Not Found' };
-  }
 
-  const title = movie.title;
+  // The page is streamable regardless of TMDB, so metadata degrades to a
+  // slug-derived title rather than advertising "Not Found" to social previews.
+  const title = movie?.title ?? titleFromSlug(idSlug, id);
   const description = `Stream the movie ${title} in high quality.`;
-  const imageUrl = getTMDBImageUrl(movie.backdrop_path || movie.poster_path, 'original');
+  const imageUrl = movie
+    ? getTMDBImageUrl(movie.backdrop_path || movie.poster_path, 'original')
+    : null;
 
   return {
     title: `Watch ${title}`,
@@ -52,32 +54,38 @@ export default async function ViewPage({ params }: Props) {
   }
 
   const movie = await fetchMovieById(id);
-  if (!movie) {
-    notFound();
-  }
 
-  const expectedSlug = slugify(movie.title);
-  const actualSlug = idSlug.substring(id.toString().length + 1);
+  // As with TV: the numeric id in the URL is all the embed needs, so a TMDB
+  // outage degrades the title instead of 404-ing a streamable page.
+  const fallbackTitle = titleFromSlug(idSlug, id);
 
-  if (actualSlug !== expectedSlug) {
-    // Optional: Redirect if slug is incorrect
-  }
-  
   // The Viewer component needs a `media` object that matches its expected props.
   // We'll adapt the `movie` object to fit the `Viewer`'s `media` prop.
-  const viewerMedia = {
-      id: movie.id,
-      imdb_id: movie.imdb_id,
-      title: { english: movie.title, romaji: movie.original_title },
-      // The viewer doesn't use all these fields for movies, so we can stub them
-      type: 'ANIME',
-      episodes: 1, 
-      chapters: null,
-      description: movie.overview,
-      coverImage: { extraLarge: movie.poster_path || '', large: movie.poster_path || '' },
-      bannerImage: movie.backdrop_path || null,
-      startDate: { year: new Date(movie.release_date).getFullYear(), month: new Date(movie.release_date).getMonth() + 1, day: new Date(movie.release_date).getDate() },
-  }
+  const viewerMedia = movie
+    ? {
+        id: movie.id,
+        imdb_id: movie.imdb_id,
+        title: { english: movie.title, romaji: movie.original_title },
+        // The viewer doesn't use all these fields for movies, so we can stub them
+        type: 'ANIME',
+        episodes: 1,
+        chapters: null,
+        description: movie.overview,
+        coverImage: { extraLarge: movie.poster_path || '', large: movie.poster_path || '' },
+        bannerImage: movie.backdrop_path || null,
+        startDate: { year: new Date(movie.release_date).getFullYear(), month: new Date(movie.release_date).getMonth() + 1, day: new Date(movie.release_date).getDate() },
+      }
+    : {
+        id,
+        title: { english: fallbackTitle, romaji: fallbackTitle },
+        type: 'ANIME',
+        episodes: 1,
+        chapters: null,
+        description: '',
+        coverImage: { extraLarge: '', large: '' },
+        bannerImage: null,
+        startDate: { year: 0, month: 0, day: 0 },
+      };
 
   return (
     <>

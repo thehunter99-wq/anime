@@ -13,6 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { cn, slugify } from '@/lib/utils';
 import { getEmbedSources, getDownloadUrl, hasDownload } from '@/lib/embed';
 import DownloadButtons from '@/components/download-buttons';
+import PlayerOverlay from '@/components/player-overlay';
+import { AdSlot } from '@/components/ad-slot';
 
 import { useToast } from '@/hooks/use-toast';
 import { saveProgress } from '@/lib/progress-store';
@@ -342,26 +344,46 @@ export default function Viewer({
             </Button>
           </div>
         )}
-        {!unavailable && iframeSrc && !loadFailed && (
-          <iframe
-            key={iframeSrc}
-            src={iframeSrc}
-            onLoad={() => {
-              setIsLoading(false);
-              setLoadFailed(false);
-            }}
-            allowFullScreen
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-            referrerPolicy="origin"
-            className={cn(
-              'h-full w-full border-0',
-              isLoading ? 'hidden' : 'block',
-              isManga ? 'max-w-4xl' : ''
-            )}
-            title={`Viewer for ${title}`}
-          ></iframe>
-        )}
+        {/* `relative` anchors the Direct Link overlay on top of the iframe.
+            The overlay is absolutely positioned and unmounts itself on first
+            activation, so every later click reaches the player untouched. */}
+        <div className="relative h-full w-full">
+          {!unavailable && iframeSrc && !loadFailed && (
+            <iframe
+              key={iframeSrc}
+              src={iframeSrc}
+              onLoad={() => {
+                setIsLoading(false);
+                setLoadFailed(false);
+              }}
+              allowFullScreen
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              referrerPolicy="origin"
+              className={cn(
+                'h-full w-full border-0',
+                isLoading ? 'hidden' : 'block',
+                isManga ? 'max-w-4xl' : ''
+              )}
+              title={`Viewer for ${title}`}
+            ></iframe>
+          )}
+
+          {/* Re-arms on every episode, season, server and route change, but only
+              while the frequency cap allows another trigger. */}
+          <PlayerOverlay
+            rearmKey={`${type}:${media.id}:${seasonNumber}:${itemNumber}:${sourceIndex}`}
+            disabled={isManga}
+          />
+        </div>
       </main>
+
+      {/* Reserved height is declared on the slot itself, so a blocked or slow ad
+          cannot shift the controls below it. */}
+      {!isManga && !unavailable && (
+        <div className="container mx-auto px-4 pb-3">
+          <AdSlot className="mx-auto max-w-3xl" />
+        </div>
+      )}
 
       {hasDownload(type) && downloadUrl && (
         <div className="container mx-auto px-4 pb-3">

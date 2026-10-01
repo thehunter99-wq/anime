@@ -7,8 +7,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
-import { AdBanner, AdsterraSocialBar, AdsterraPopunder } from "@/components/ads";
-import NativeBanner from "@/components/native-banner";
+import { AdSlot, NativeBannerAd } from "@/components/ads";
+import AdUnderlays from "@/components/ad-underlays";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -188,14 +188,18 @@ export default function RootLayout({
         <DisclaimerModal />
         <div className="flex-grow">{children}</div>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <AdBanner label="Advertisement" />
-          <NativeBanner label="Advertisement" />
+          {/* Global ad stack. NativeBannerAd is a singleton — it lives here and
+              only here; every other ad position uses AdSlot. Both declare their
+              own reserved height so a blocked script cannot cause CLS. */}
+          <AdSlot label="Advertisement" />
+          <NativeBannerAd label="Advertisement" />
         </div>
         <Footer />
         <Toaster />
         <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
-        <AdsterraSocialBar />
-        <AdsterraPopunder />
+        {/* Underlays load afterInteractive so they never block first paint, and
+            are chosen per route so the player stays usable. */}
+        <AdUnderlays />
       </body>
     </html>
   );

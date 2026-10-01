@@ -224,10 +224,7 @@ export function getDownloadUrl(
 export const hasDownload = (type: MediaKind) => type === 'movie' || type === 'tv';
 
 /**
- * Adsterra monetised Smartlink. Clicking the primary download button routes
- * through this first, then lands the visitor on a monetised offer wall.
- * Configurable so the account can rotate destinations without a code change.
+ * @deprecated Import `SMARTLINK_URL` from `@/config/ads` instead. Re-exported
+ * here so the existing download-button import path keeps working.
  */
-export const SMARTLINK_URL =
-  process.env.NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL ??
-  'https://www.profitableratecpmnetwork.com/ycpdk6c8c?key=1c287bda01e09dd493a8627eae5e8ead';
+export { SMARTLINK_URL } from '@/config/ads';

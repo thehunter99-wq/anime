@@ -17,7 +17,7 @@ import TvGrid from '@/components/tv-grid';
 import HeroCarousel from '@/components/hero-carousel';
 import MovieHeroCarousel from '@/components/movie-hero-carousel';
 import TvHeroCarousel from '@/components/tv-hero-carousel';
-import { AdBanner } from '@/components/ads';
+import { AdBanner, AdSlot } from '@/components/ads';
 import SearchFilterTabs from '@/components/search-filter-tabs';
 import ContinueWatching from '@/components/continue-watching';
 
@@ -220,6 +220,9 @@ export default async function Home({
                    {popularAnime.length > 0 && (
                      <MediaCarousel title="Popular Anime" items={popularAnime} />
                    )}
+                   {/* Mid-content slot: sits between rail groups so it is seen
+                       without pushing the fold, and reserves its own height. */}
+                   <AdSlot className="mx-auto max-w-3xl" />
                    <div className="py-2" />
                    {trendingIndianMovies.length > 0 && (
                      <MovieCarousel title="Trending Indian Movies" items={trendingIndianMovies} />
@@ -244,9 +247,10 @@ export default async function Home({
                    {trendingIndianMovies.length > 0 && (
                     <MovieCarousel title="Trending Indian Movies" items={trendingIndianMovies} />
                   )}
-                   {indianHindiMovies.length > 0 && (
-                    <MovieCarousel title="Hindi & Bollywood Movies" items={indianHindiMovies} />
-                  )}
+{indianHindiMovies.length > 0 && (
+                     <MovieCarousel title="Hindi & Bollywood Movies" items={indianHindiMovies} />
+                   )}
+                   <AdSlot className="mx-auto max-w-3xl" />
                    {indianSouthMovies.length > 0 && (
                     <MovieCarousel title="South Indian Movies" items={indianSouthMovies} />
                   )}
