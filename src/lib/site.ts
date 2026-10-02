@@ -8,7 +8,7 @@
 export const SITE_NAME = 'Cineverse HD';
 
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://animovie.parthakashyap.com';
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://movanime.site';
 
 /** Support/community link used by the report and request buttons. */
 export const TELEGRAM_URL =

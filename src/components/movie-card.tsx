@@ -1,3 +1,4 @@
+import { moviePath } from '@/lib/routes';
 import Image from 'next/image';
 import Link from 'next/link';
 import { type Movie } from '@/lib/types';
@@ -16,7 +17,7 @@ interface MovieCardProps {
 export default function MovieCard({ item }: MovieCardProps) {
   const title = item.title;
   const posterUrl = getTMDBImageUrl(item.poster_path);
-  const movieUrl = `/media/movie/${item.id}-${slugify(title)}`;
+  const movieUrl = moviePath(item.id);
   const year = item.release_date ? new Date(item.release_date).getFullYear() : 'N/A';
 
   return (

@@ -1,3 +1,4 @@
+import { animeOrMangaPath } from '@/lib/routes';
 import Image from 'next/image';
 import Link from 'next/link';
 import { type Media } from '@/lib/types';
@@ -14,7 +15,7 @@ interface MediaCardProps {
 export default function MediaCard({ item }: MediaCardProps) {
   const title = item.title.english || item.title.romaji;
   const isAnime = item.type === 'ANIME';
-  const mediaUrl = `/media/${item.type.toLowerCase()}/${item.id}-${slugify(title)}`;
+  const mediaUrl = animeOrMangaPath(item.type, item.id);
 
   return (
       <Card className="group w-full overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 border-transparent hover:border-primary/50">

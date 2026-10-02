@@ -1,5 +1,7 @@
 'use client';
 
+import { animeOrMangaPath } from '@/lib/routes';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -62,7 +64,7 @@ function HeroSlide({ item }: HeroSlideProps) {
     ?.replace(/<br>/g, ' ')
     .replace(/<i>/g, '')
     .replace(/<\/i>/g, '');
-  const mediaUrl = `/media/${item.type.toLowerCase()}/${item.id}-${slugify(title)}`;
+  const mediaUrl = animeOrMangaPath(item.type, item.id);
   const isAnime = item.type === 'ANIME';
 
   return (

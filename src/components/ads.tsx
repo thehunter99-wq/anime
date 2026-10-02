@@ -27,10 +27,21 @@ declare global {
 /**
  * Underlay scripts (popunder + social bar).
  *
- * Both are plain `<Script strategy="afterInteractive">` tags mounted in the root
- * layout, so they load after hydration on every route and never block first
- * paint. Each is deferred by its own delay so a single page view never fires both
- * underlays at once, which networks penalise.
+ * STRATEGY: both are `lazyOnload`, not `afterInteractive`.
+ *
+ * `afterInteractive` injects the script as soon as hydration begins, which puts
+ * third-party parser work on the critical path and inflates TBT — exactly the
+ * metric that decides whether a page passes Core Web Vitals. `lazyOnload` defers
+ * until the browser is idle after load, by which point LCP and TBT have already
+ * been committed. The scripts still fire before most meaningful scroll depth, so
+ * revenue is largely unaffected.
+ *
+ * For crawlers this is a non-issue: Googlebot renders JS and waits for network
+ * idle, so the impressions still register, and the tags themselves are ordinary
+ * script tags in the DOM rather than anything that blocks indexing.
+ *
+ * Each unit is also gated by its own delay, so a single page view never fires
+ * both underlays at once — networks penalise that pattern.
  *
  * A failed load only logs: every ad unit here is decorative, and the video
  * player is a sibling element that is never gated on any of this resolving.
@@ -50,7 +61,7 @@ export function AdsterraPopunder() {
     <Script
       id="adsterra-popunder"
       src={POPUNDER_URL}
-      strategy="afterInteractive"
+      strategy="lazyOnload"
       async
       onError={() => console.warn('[Adsterra] Popunder script failed to load.')}
     />
@@ -71,7 +82,7 @@ export function AdsterraSocialBar() {
     <Script
       id="adsterra-social-bar"
       src={SOCIAL_BAR_URL}
-      strategy="afterInteractive"
+      strategy="lazyOnload"
       async
       onError={() => console.warn('[Adsterra] Social bar script failed to load.')}
     />

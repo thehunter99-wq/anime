@@ -197,6 +197,53 @@ export async function fetchTVShowById(id: number): Promise<TVShow | null> {
     return null;
 }
 
+/* ─────────────────────── Discovery lists (sitemap) ─────────────────────── */
+
+/**
+ * Top-level discovery lists used to build the sitemap.
+ *
+ * These are deliberately distinct lists rather than one merged list: a title
+ * that is popular, trending AND now-playing would otherwise appear three times,
+ * which wastes crawl budget. The sitemap merges by id and de-duplicates.
+ *
+ * All return an empty array when TMDB is unreachable, so sitemap generation
+ * degrades to static routes instead of failing the build.
+ */
+export async function fetchPopularMovies(page = 1): Promise<Movie[]> {
+  return (await fetchFromTMDB('/movie/popular', { page: page.toString() })) as Movie[];
+}
+
+export async function fetchTrendingMovies(page = 1): Promise<Movie[]> {
+  return (await fetchFromTMDB('/trending/movie/week', { page: page.toString() })) as Movie[];
+}
+
+export async function fetchNowPlayingMovies(page = 1): Promise<Movie[]> {
+  return (await fetchFromTMDB('/movie/now_playing', { page: page.toString() })) as Movie[];
+}
+
+export async function fetchPopularTv(page = 1): Promise<TVShow[]> {
+  return (await fetchFromTMDB('/tv/popular', { page: page.toString() })) as TVShow[];
+}
+
+export async function fetchTrendingTv(page = 1): Promise<TVShow[]> {
+  return (await fetchFromTMDB('/trending/tv/week', { page: page.toString() })) as TVShow[];
+}
+
+/**
+ * Latest-registered anime in TMDB. `with_genres=16` is the Animation genre and
+ * `with_original_language=ja` restricts to Japanese-origin titles, which keeps
+ * Western cartoons out of the anime rail.
+ */
+export async function fetchAnimeTv(page = 1): Promise<TVShow[]> {
+  return (await fetchFromTMDB('/discover/tv', {
+    with_genres: '16',
+    with_original_language: 'ja',
+    sort_by: 'popularity.desc',
+    include_adult: 'false',
+    page: page.toString(),
+  })) as TVShow[];
+}
+
 /**
  * TMDB keyword id for "anime". Used as a soft signal; TMDB filters this keyword
  * inconsistently on /search/tv, so it narrows results but never gates them.

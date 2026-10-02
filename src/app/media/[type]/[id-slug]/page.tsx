@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { fetchMediaById } from '@/lib/anilist';
 import { type Metadata } from 'next';
-import { slugify } from '@/lib/utils';
 import Header from '@/components/header';
 import { SeasonEpisodeSelector } from '@/components/season-episode-selector';
 import { Badge } from '@/components/ui/badge';
@@ -51,20 +50,19 @@ export default async function MediaDetailsPage({ params }: Props) {
   const { 'id-slug': idSlug, type } = await params;
   const id = parseInt(idSlug.split('-')[0], 10);
 
-  if (isNaN(id) || !['anime', 'manga'].includes(type)) {
+  /**
+   * Manga only. Anime used to render here too, but it now lives at the canonical
+   * `/anime/[id]`, and `src/middleware.ts` issues a real 308 for `/media/anime/*`
+   * before this route is ever reached. Restricting the allowed types keeps the
+   * page from silently becoming a second render path for anime.
+   */
+  if (isNaN(id) || type !== 'manga') {
     notFound();
   }
 
   const media = await fetchMediaById(id);
   if (!media) {
     notFound();
-  }
-
-  const expectedSlug = slugify(media.title.english || media.title.romaji);
-  const actualSlug = idSlug.substring(id.toString().length + 1);
-
-  if (actualSlug !== expectedSlug) {
-    // Optional: Redirect to canonical URL if slug is incorrect for SEO
   }
 
   const title = media.title.english || media.title.romaji;

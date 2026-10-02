@@ -1,5 +1,7 @@
 'use client';
 
+import { animeOrMangaPath, moviePath, tvPath } from '@/lib/routes';
+
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Image from 'next/image';
@@ -37,12 +39,10 @@ function getSuggestionKind(item: Suggestion): SuggestionKind {
 
 function getSuggestionUrl(item: Suggestion): string {
   if (item.kind === 'tmdb') {
-    const { id, mediaType, title } = item.data;
-    return `/media/${mediaType}/${id}-${slugify(title)}`;
+    const { id, mediaType } = item.data;
+    return mediaType === 'tv' ? tvPath(id) : moviePath(id);
   }
-  const media = item.data;
-  const title = media.title.english || media.title.romaji;
-  return `/media/${media.type.toLowerCase()}/${media.id}-${slugify(title)}`;
+  return animeOrMangaPath(item.data.type, item.data.id);
 }
 
 function getSuggestionTitle(item: Suggestion): string {

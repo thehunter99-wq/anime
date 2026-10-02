@@ -1,3 +1,4 @@
+import { tvPath } from '@/lib/routes';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -17,7 +18,7 @@ interface TvCardProps {
 export default function TvCard({ item }: TvCardProps) {
   const title = item.name;
   const posterUrl = getTMDBImageUrl(item.poster_path);
-  const tvUrl = `/media/tv/${item.id}-${slugify(title)}`;
+  const tvUrl = tvPath(item.id);
   const year = item.first_air_date ? new Date(item.first_air_date).getFullYear() : 'N/A';
 
   return (

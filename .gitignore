@@ -43,3 +43,5 @@ next-env.d.ts
 !.env.example
 
 .qodo
+# Local Netlify folder
+.netlify

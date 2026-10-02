@@ -1,3 +1,4 @@
+import { animeOrMangaPath } from '@/lib/routes';
 import Link from 'next/link';
 import Image from 'next/image';
 import { type Media } from '@/lib/types';
@@ -73,7 +74,7 @@ export default function RelatedMedia({ relations }: RelatedMediaProps) {
 
 function RelatedMediaCard({ item }: { item: Media & { relationType: string } }) {
   const title = item.title.english || item.title.romaji;
-  const mediaUrl = `/media/${item.type.toLowerCase()}/${item.id}-${slugify(title)}`;
+  const mediaUrl = animeOrMangaPath(item.type, item.id);
 
   return (
     <Card className="group w-full overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 border-transparent hover:border-primary/50 h-full flex flex-col">

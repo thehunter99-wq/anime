@@ -1,6 +1,8 @@
 
 'use client';
 
+import { tvPath } from '@/lib/routes';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -61,7 +63,7 @@ interface HeroSlideProps {
 function HeroSlide({ item }: HeroSlideProps) {
   const title = item.name;
   const description = item.overview;
-  const mediaUrl = `/media/tv/${item.id}-${slugify(title)}`;
+  const mediaUrl = tvPath(item.id);
   const bannerUrl = getTMDBImageUrl(item.backdrop_path, 'original');
   const posterUrl = getTMDBImageUrl(item.poster_path, 'w500');
 

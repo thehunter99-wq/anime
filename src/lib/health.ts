@@ -40,14 +40,14 @@ export function getAdsterraKey() {
 export function getAdsterraSocialBarUrl() {
   return (
     process.env.NEXT_PUBLIC_ADSTERRA_SOCIAL_BAR_URL ??
-    'https://pl31576647.profitableratecpmnetwork.com/ac/65/79/ac65794ec051ffa9b7ab68ab5027f1d2.js'
+    'https://pl31625876.profitableratecpmnetwork.com/77/43/d2/7743d209f9e5ab47329ac706ebe9fa56.js'
   );
 }
 
 export function getAdsterraPopunderUrl() {
   return (
     process.env.NEXT_PUBLIC_ADSTERRA_POPUNDER_URL ??
-    'https://pl31576876.profitableratecpmnetwork.com/fa/79/81/fa7981af9d98b11f335221786bc8b090.js'
+    'https://pl31625875.profitableratecpmnetwork.com/be/f0/3c/bef03cbd6a8d7712fde3e921125ecc00.js'
   );
 }
 
@@ -217,14 +217,14 @@ export function checkAdsterra(): CheckResult {
 export function getAdsterraSmartlinkUrl() {
   return (
     process.env.NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL ??
-    'https://www.profitableratecpmnetwork.com/ycpdk6c8c?key=1c287bda01e09dd493a8627eae5e8ead'
+    'https://www.profitableratecpmnetwork.com/tguhgg4ee?key=b0ad7e27ed01791677110762cfb5d058'
   );
 }
 
 export function getAdsterraNativeBannerUrl() {
   return (
     process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL ??
-    'https://pl31577360.profitableratecpmnetwork.com/ebab695606cac21b468c0fe20067b7f6/invoke.js'
+    'https://pl31625878.profitableratecpmnetwork.com/89898e7af070f78c4da937a6a83f13c7/invoke.js'
   );
 }
 

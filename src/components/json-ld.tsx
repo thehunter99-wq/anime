@@ -8,12 +8,12 @@ interface JsonLdProps {
   itemNumber: number;
 }
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://animovie.parthakashyap.com';
+import { SITE_URL } from '@/lib/site';
 
 function JsonLd({ media, type, itemNumber }: JsonLdProps) {
   const title = media.title.english || media.title.romaji;
   const slug = slugify(title);
-  const canonicalUrl = `${siteUrl}/view/${type}/${media.id}-${slug}?item=${itemNumber}`;
+  const canonicalUrl = `${SITE_URL}/view/${type}/${media.id}-${slug}?item=${itemNumber}`;
 
   let schema: object;
 

@@ -1,6 +1,8 @@
 
 'use client';
 
+import { animeOrMangaPath, moviePath, tvPath } from '@/lib/routes';
+
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
@@ -260,7 +262,11 @@ export default function Viewer({
     setItemNumber(1); // Reset to first episode of new season
   }
 
-  const backLink = isMovie ? `/media/movie/${media.id}-${slugify(title)}` : isTv ? `/media/tv/${media.id}-${slugify(title)}` : `/media/${type}/${media.id}-${slugify(title)}`;
+  const backLink = isMovie
+    ? moviePath(media.id)
+    : isTv
+      ? tvPath(media.id)
+      : animeOrMangaPath(type, media.id);
   
   const itemLabel = isAnime || isTv ? 'Episode' : 'Chapter';
 
