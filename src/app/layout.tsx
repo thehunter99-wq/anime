@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
-import { AdSlot, NativeBannerAd } from "@/components/ads";
+import { BannerSlots, NativeBannerAd } from "@/components/ads";
 import AdUnderlays from "@/components/ad-underlays";
 import AdConfigDiagnostic from "@/components/ad-config-diagnostic";
 import { AdBlockDetector } from "@/components/adblock-detector";
@@ -305,13 +305,19 @@ export default async function RootLayout({
         )}
       >
         <DisclaimerModal />
+        {/* Top of every page, above the page's own content. */}
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <BannerSlots positions={['header']} />
+        </div>
         <div className="flex-grow">{children}</div>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Global ad stack. NativeBannerAd is a singleton — it lives here and
-              only here; every other ad position uses AdSlot. Both declare their
-              own reserved height so a blocked script cannot cause CLS. */}
-          <AdSlot label="Advertisement" />
+          {/* NativeBannerAd is a singleton — it lives here and only here, because
+              the loader binds to the first element matching its container id.
+              Every repeatable position uses BannerSlots/AdSlot instead. Both
+              declare their own reserved height so a blocked script cannot
+              cause CLS. */}
           <NativeBannerAd label="Advertisement" />
+          <BannerSlots positions={['footer']} />
         </div>
         <Footer />
         <Toaster />

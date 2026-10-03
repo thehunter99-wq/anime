@@ -219,6 +219,28 @@ export const AD_RESERVED_HEIGHT = {
 } as const;
 
 /**
+ * The four banner positions requested, in the order they should appear.
+ *
+ * `id` is stable and used for per-slot analytics and to key the once-per-session
+ * rotation, so do not rename them casually. `format` maps to the Adsterra
+ * in-content format names.
+ *
+ * NOTE ON POSITIONS vs ZONES: these four slots all use the SINGLE in-content
+ * zone key (NEXT_PUBLIC_ADSTERRA_KEY). Unlike the native banner — which is
+ * pinned to one container id — the in-content format assigns each slot a unique
+ * container id, so multiple slots on one page is a supported configuration.
+ * Four placements therefore need only the one key you already have.
+ */
+export const BANNER_SLOTS = [
+  { id: 'header', label: 'Advertisement', format: 'fluid' },
+  { id: 'below-video', label: 'Advertisement', format: 'fluid' },
+  { id: 'above-recommendations', label: 'Advertisement', format: 'fluid' },
+  { id: 'footer', label: 'Advertisement', format: 'fluid' },
+] as const satisfies readonly { id: string; label: string; format: string }[];
+
+export type BannerSlotId = (typeof BANNER_SLOTS)[number]['id'];
+
+/**
  * Direct Link guardrail: 3 triggers per 10 minutes (~43/day/user worst case).
  * Networks ban at roughly 5-10 per session, so this stays well under.
  */

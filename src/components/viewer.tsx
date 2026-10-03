@@ -16,7 +16,7 @@ import { cn, slugify } from '@/lib/utils';
 import { getEmbedSources, getDownloadUrl, hasDownload } from '@/lib/embed';
 import DownloadButtons from '@/components/download-buttons';
 import PlayerOverlay from '@/components/player-overlay';
-import { AdSlot } from '@/components/ad-slot';
+import { BannerSlots } from '@/components/ads';
 
 import { useToast } from '@/hooks/use-toast';
 import { saveProgress } from '@/lib/progress-store';
@@ -386,11 +386,13 @@ export default function Viewer({
         </div>
       </main>
 
-      {/* Reserved height is declared on the slot itself, so a blocked or slow ad
-          cannot shift the controls below it. */}
+      {/* The `below-video` placement. Only the viewer knows where the player
+          ends, so it is hosted here rather than in the layout. Reserved height
+          is declared on the slot itself, so a blocked or slow ad cannot shift
+          the controls below it. */}
       {!isManga && !unavailable && (
         <div className="container mx-auto px-4 pb-3">
-          <AdSlot className="mx-auto max-w-3xl" />
+          <BannerSlots positions={['below-video']} className="mx-auto max-w-3xl" />
         </div>
       )}
 

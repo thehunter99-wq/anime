@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * Site-wide Adsterra units: popunder and social bar.
+ *
+ * These two are separate from the in-page slots because they inject themselves
+ * (a new window, a fixed bar) rather than rendering into a container on the
+ * page. They are mounted once in the root layout.
+ */
 import Script from 'next/script';
 import { useEffect, useRef, useState } from 'react';
 
@@ -12,8 +19,6 @@ import {
 } from '@/config/ads';
 import { isPopunderCapped, recordPopunderTrigger } from '@/lib/popunder-cap';
 import { isSocialBarCapped, recordSocialBarTrigger } from '@/lib/social-bar-cap';
-
-export { AdSlot as AdBanner, AdSlot, NativeBannerAd } from '@/components/ad-slot';
 
 declare global {
   interface Window {
