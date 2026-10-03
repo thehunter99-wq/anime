@@ -129,10 +129,42 @@ export const SOCIAL_BAR_URL = SOCIAL_BAR_ZONE_URL;
  */
 export const NATIVE_BANNER_URL = NATIVE_BANNER_ZONE_URL;
 
-/** In-content loader (ssat.pro). Empty when no zone key is configured. */
-export const IN_CONTENT_LOADER_URL = ADSTERRA_KEY
-  ? `https://ssat.pro/cdn/client.js?key=${encodeURIComponent(ADSTERRA_KEY)}`
+/**
+ * In-content zone loader.
+ *
+ * ── WHY THIS IS NOT ssat.pro ────────────────────────────────────────────────
+ * The Adsterra "Banner (in-content)" integration is usually documented as
+ * `https://ssat.pro/cdn/client.js?key=<zone>`. That host has NO DNS RECORD —
+ * `Resolve-DnsName ssat.pro` fails — so every in-content slot sat waiting on a
+ * loader that could never arrive. No amount of correct key configuration or CSP
+ * work fixes that, which is exactly why the slots looked dead while the
+ * dashboard said the zone was active.
+ *
+ * Your in-content zone is instead served by the same CDN as the native banner,
+ * parameterised by the zone hash:
+ *
+ *   https://pl31625878.profitableratecpmnetwork.com/<zone-hash>/invoke.js
+ *
+ * Verified live: that path returns HTTP 200 with a ~49KB payload, the payload
+ * embeds its own zone hash, and it fills containers by scanning for
+ * `container-<hash>` — the same mechanism as the native banner, NOT atOptions.
+ * A bogus hash returns 200 with a 0-byte body, so the 200 alone is not proof;
+ * the embedded hash is.
+ *
+ * Empty when no zone key is configured, which disables the in-content slots.
+ */
+export const IN_CONTENT_ZONE_URL = ADSTERRA_KEY
+  ? `https://pl31625878.profitableratecpmnetwork.com/${ADSTERRA_KEY}/invoke.js`
   : '';
+
+/** Kept as the historical name; now resolves to the zone loader above. */
+export const IN_CONTENT_LOADER_URL = IN_CONTENT_ZONE_URL;
+
+/**
+ * Container id the in-content zone loader scans for. Same rule as the native
+ * banner: `container-<zone-hash>`.
+ */
+export const IN_CONTENT_CONTAINER_ID = ADSTERRA_KEY ? `container-${ADSTERRA_KEY}` : '';
 
 /**
  * The zone hash is the first path segment after the hostname
@@ -198,9 +230,24 @@ export const DIRECT_LINK_URL = envOr('NEXT_PUBLIC_ADSTERRA_DIRECT_LINK_URL', '')
  * LCP inflates bounce, and bounced impressions are the fastest route to a
  * domain being judged low-quality.
  */
+/**
+ * Load delays, in ms after hydration.
+ *
+ * These are MINIMUM DWELL times, not "resolve on idle" hints — `global-ads.tsx`
+ * enforces them as a hard floor so a fast idle callback or an early mousemove
+ * cannot pull an ad script in during the first paint. Loading ad scripts before
+ * LCP inflates bounce, and bounced impressions are the fastest route to a
+ * domain being judged low-quality.
+ *
+ * Tuned down from 30s / 3.5s. The popunder sat at 30s PLUS an engagement
+ * requirement, which in practice meant it almost never armed inside a normal
+ * visit — it looked permanently broken rather than cautious. 12s still leaves
+ * LCP and the first meaningful interaction clear, and Adsterra's own allowance
+ * (about one popunder per 30 min) is enforced separately by POPUNDER_CAP.
+ */
 export const AD_DELAYS = {
-  socialBar: 3500,
-  popunder: 30000,
+  socialBar: 2500,
+  popunder: 12000,
 } as const;
 
 /** Minimum delay before any ad script may load. */
@@ -212,9 +259,19 @@ export const INTERACTION_EVENTS = ['scroll', 'mousemove', 'touchstart', 'keydown
 /**
  * Reserved heights, declared before the network responds so a slow or blocked ad
  * cannot shift the page (CLS).
+ *
+ * RESPONSIVE BY DESIGN. The in-content slot was a flat `min-h-[250px]`, which is
+ * correct for a 300px-wide desktop ad but is a full-width grey block on a phone —
+ * and with four placements that pushed most of a mobile page below the fold
+ * before any content was reached. The smaller mobile floor still prevents CLS;
+ * the slot simply has room to grow once the creative arrives, because `min-h-*`
+ * is a floor and never a cap.
+ *
+ * The native banner is 90px on all sizes because that is the height the zone
+ * itself renders at.
  */
 export const AD_RESERVED_HEIGHT = {
-  inContent: 'min-h-[250px]',
+  inContent: 'min-h-[140px] sm:min-h-[250px]',
   native: 'min-h-[90px]',
 } as const;
 

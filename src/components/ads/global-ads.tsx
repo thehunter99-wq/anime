@@ -22,13 +22,18 @@ import { isSocialBarCapped, recordSocialBarTrigger } from '@/lib/social-bar-cap'
 
 declare global {
   interface Window {
+    /**
+     * The Adsterra in-content loader reads this as a QUEUE, so it must be typed
+     * as an array. Declaring it as a single object (or in more than one file)
+     * breaks the build with a conflicting-property type error.
+     */
     atOptions?: {
       key: string;
       format: string;
       height?: number;
       width?: number;
       params?: Record<string, unknown>;
-    };
+    }[];
   }
 }
 

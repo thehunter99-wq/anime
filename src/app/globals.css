@@ -203,12 +203,37 @@
 }
 
 @layer utilities {
+  /*
+   * `overflow-x: clip` on the page root.
+   *
+   * `.carousel-track` uses `-mx-4 px-4` so cards can bleed to the screen edge
+   * while their internal padding stays aligned with the rest of the page. That
+   * negative margin makes the track wider than its parent, so any ancestor
+   * without an overflow guard becomes a horizontal scroll container. On a phone
+   * this shows up as the whole page panning sideways when you scroll vertically,
+   * which reads as a broken layout.
+   *
+   * `clip` rather than `hidden`: `hidden` on a parent turns the element into a
+   * scroll container, which breaks `position: sticky` on descendants — the
+   * header. `clip` contains the overflow without creating a scrollport, so
+   * sticky keeps working. `overflow-x: hidden` is kept as the leading fallback
+   * for browsers without `clip`.
+   */
+  html,
+  body {
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
   .carousel-container {
     @apply relative overflow-hidden;
   }
   .carousel-track {
     @apply flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4;
     scroll-snap-type: x mandatory;
+    /* Momentum scrolling on iOS, and stop a track from chaining to a parent. */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
   .carousel-item {
     @apply flex-shrink-0 w-40 sm:w-48 md:w-56 lg:w-64 snap-center snap-always;

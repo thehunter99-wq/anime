@@ -125,7 +125,15 @@ const AD_HOSTS = [
   'https://*.propellerads.com',
 ] as const;
 
-const AD_SCRIPT_HOSTS = [...AD_HOSTS, 'https://ssat.pro', 'https://tagserv.com'] as const;
+/**
+ * Hosts allowed to SERVE ad scripts.
+ *
+ * `ssat.pro` was removed deliberately. It is the host the Adsterra in-content
+ * docs name, but it has no DNS record, so allowing it was dead configuration.
+ * The in-content zone on this account is served from `*.profitableratecpmnetwork.com`
+ * like every other zone, which `AD_HOSTS` already covers.
+ */
+const AD_SCRIPT_HOSTS = [...AD_HOSTS, 'https://tagserv.com'] as const;
 
 /**
  * Content Security Policy.
@@ -143,10 +151,14 @@ function buildCSP(request: NextRequest): string {
 
   const csp = [
     "default-src 'self'",
-    // `unsafe-inline` is required for the inline atOptions.push() bootstrap that
-    // AdSlot injects. It is scoped as narrowly as the directive allows, and
-    // strict-dynamic + nonce means a non-parser-inserted inline script still
-    // cannot introduce new script hosts on its own.
+    // `'unsafe-inline'` IS INERT HERE and must not be relied on. Any CSP3 browser
+    // that honours `'strict-dynamic'` ignores `'unsafe-inline'` entirely, so an
+    // inline script without the request nonce is blocked no matter what this
+    // directive says. It is kept only for older browsers, and NO ad unit may
+    // depend on it: the in-content slot used to push its config through an inline
+    // <script>, was silently blocked by exactly this, and rendered nothing while
+    // the dashboard reported the zone as active. Ad config now travels in the
+    // script URL plus a DOM container id, so no inline script is involved.
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' ${AD_SCRIPT_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     // data: is required — Adsterra creatives are frequently inline base64 SVG.
