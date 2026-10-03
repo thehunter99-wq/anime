@@ -178,7 +178,13 @@ export function AdsterraPopunder() {
       src={POPUNDER_URL}
       strategy="lazyOnload"
       async
-      onError={() => console.warn('[Adsterra] Popunder script failed to load.')}
+      // A silently failing popunder is indistinguishable from "not configured",
+      // which is the single hardest thing to debug. Say so loudly, with the URL.
+      onError={() =>
+        console.error(
+          `[adsterra] popunder failed to load from ${POPUNDER_URL}. Check that the zone is active and that CSP script-src/connect-src allow *.profitableratecpmnetwork.com.`
+        )
+      }
     />
   );
 }
@@ -232,7 +238,11 @@ export function AdsterraSocialBar() {
       src={SOCIAL_BAR_URL}
       strategy="lazyOnload"
       async
-      onError={() => console.warn('[Adsterra] Social bar script failed to load.')}
+      onError={() =>
+        console.error(
+          `[adsterra] social bar failed to load from ${SOCIAL_BAR_URL}. Check that the zone is active and that CSP script-src/connect-src allow *.profitableratecpmnetwork.com.`
+        )
+      }
     />
   );
 }

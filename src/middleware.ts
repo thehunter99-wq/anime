@@ -100,25 +100,69 @@ const SECURITY_HEADERS = {
 } as const;
 
 /**
- * Content Security Policy for the application.
- * Strict but allows necessary external resources (TMDB images, Adsterra scripts).
+ * Ad network origins, in one place so script/connect/img/frame stay in sync.
+ *
+ * These MUST stay complete. The previous policy listed the three zone hosts in
+ * `script-src` and nothing else, so an ad script would load and then fail
+ * every subsequent step of its own lifecycle:
+ *   - `connect-src` had no ad host, so the impression/impression-beacon POST was
+ *     blocked. The ad "worked" visually but recorded no impression, i.e. it paid
+ *     nothing, and the console showed only CSP errors.
+ *   - `img-src` had no ad host, so ad creative images were blocked and slots
+ *     rendered empty.
+ *   - `form-action 'self'` blocked any ad unit that submits a form.
+ *
+ * Wildcard subdomains are used because Adsterra rotates creatives across
+ * `pl*` hosts and serves from `*.adsterra.com` / `*.highrevenuegate.com`
+ * for its own units. Listing only the three known hosts is what caused the
+ * partial-failure behaviour in the first place.
+ */
+const AD_HOSTS = [
+  'https://*.profitableratecpmnetwork.com',
+  'https://*.adsterra.com',
+  'https://*.highrevenuegate.com',
+  'https://*.hilltopads.com',
+  'https://*.propellerads.com',
+] as const;
+
+const AD_SCRIPT_HOSTS = [...AD_HOSTS, 'https://ssat.pro', 'https://tagserv.com'] as const;
+
+/**
+ * Content Security Policy.
+ *
+ * `'strict-dynamic'` is kept together with the per-request nonce: Next.js reads
+ * the nonce out of this header and stamps it onto its own script tags, which
+ * means dynamically-created ad scripts stay allowed without opening
+ * `script-src` to `'unsafe-inline'` site-wide.
+ *
+ * The explicit host list is retained because CSP3 browsers ignore host sources
+ * when `strict-dynamic` is present, while older browsers still rely on them.
  */
 function buildCSP(request: NextRequest): string {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-  
+
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://pl31625875.profitableratecpmnetwork.com https://pl31625876.profitableratecpmnetwork.com https://pl31625878.profitableratecpmnetwork.com https://ssat.pro https://www.googletagmanager.com https://www.google-analytics.com`,
+    // `unsafe-inline` is required for the inline atOptions.push() bootstrap that
+    // AdSlot injects. It is scoped as narrowly as the directive allows, and
+    // strict-dynamic + nonce means a non-parser-inserted inline script still
+    // cannot introduce new script hosts on its own.
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' ${AD_SCRIPT_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: https://image.tmdb.org https://s4.anilist.co https://placehold.co https://images.unsplash.com https://picsum.photos",
-    "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com",
-    "frame-src 'self' https://vidsrc.pm https://vidlink.pro https://www.2embed.cc https://vidsrc.sbs https://autoembed.co https://www.profitableratecpmnetwork.com",
+    // data: is required — Adsterra creatives are frequently inline base64 SVG.
+    `img-src 'self' data: blob: https://image.tmdb.org https://s4.anilist.co https://placehold.co https://images.unsplash.com https://picsum.photos ${AD_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
+    "font-src 'self' data: https://fonts.gstatic.com",
+    // Ad units beacon back to their own network after rendering; without these
+    // the impression is never recorded.
+    `connect-src 'self' ${AD_SCRIPT_HOSTS.join(' ')} https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com https://*.google-analytics.com`,
+    // Ad units render their creative inside an iframe on the network's domain.
+    `frame-src 'self' ${AD_HOSTS.join(' ')} https://vidsrc.pm https://vidlink.pro https://www.2embed.cc https://vidsrc.sbs https://autoembed.co`,
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    // Some Adsterra units post a form to their lander. 'self' alone blocked them.
+    `form-action 'self' ${AD_HOSTS.join(' ')}`,
     "frame-ancestors 'none'",
-    "upgrade-insecure-requests",
+    'upgrade-insecure-requests',
   ].join('; ');
 
   return csp;
@@ -172,32 +216,45 @@ function isGoodBot(userAgent: string): boolean {
   return goodBots.some(bot => ua.includes(bot));
 }
 
+/**
+ * Patterns that indicate automated abuse rather than a real visitor.
+ *
+ * ── Why this list was tightened ──────────────────────────────────────────────
+ * The previous list contained bare `bot`, `spider`, `crawler`, `monitor`,
+ * `checker`, `extractor` and `harvester`, and matched them as SUBSTRINGS of the
+ * whole UA. That returned 403 Forbidden to real humans: corporate AV gateways,
+ * uptime monitors, link-preview bots and security scanners all put words like
+ * these in their UA, and a 403 on an ad or page load is revenue lost for a
+ * request that was never abusive.
+ *
+ * The list below now matches only unambiguous agent tokens, and the caller no
+ * longer applies the 403 to assets or API routes at all.
+ */
 function isSuspiciousBot(userAgent: string): boolean {
   const badPatterns = [
     'scrapy',
-    'crawler',
-    'spider',
-    'bot',
-    'wget',
-    'curl',
     'python-requests',
     'go-http-client',
     'java/',
     'php/',
     'perl/',
     'ruby/',
-    'scanner',
-    'monitor',
-    'checker',
-    'extractor',
-    'harvester',
+    'libwww-perl',
+    'okhttp',
+    'axios/',
+    'node-fetch',
+    'headlesschrome',
+    'puppeteer',
+    'playwright',
+    'selenium',
+    'webdriver',
   ];
-  
+
   const ua = userAgent.toLowerCase();
-  // Allow good bots
   if (isGoodBot(ua)) return false;
-  
-  // Block suspicious patterns
+  // An empty UA is not evidence of abuse.
+  if (!ua) return false;
+
   return badPatterns.some(pattern => ua.includes(pattern));
 }
 
@@ -485,12 +542,20 @@ export function middleware(request: NextRequest) {
   }
 
   // ── Bot Protection ──────────────────────────────────────────────────────
-  // Block suspicious bots on non-API routes (but allow them on /api/health for monitoring)
-  if (!pathname.startsWith('/api/health') && isSuspiciousBot(userAgent)) {
-    // Return 403 for suspicious bots, but don't block known good bots
-    if (!isGoodBot(userAgent) && !pathname.startsWith('/api/')) {
-      return new NextResponse('Forbidden', { status: 403 });
-    }
+  /**
+   * Applies ONLY to document (HTML) requests.
+   *
+   * The previous version could return 403 for any non-API path, which included
+   * static assets. A 403 on an asset is invisible in analytics but removes the
+   * thing that would have earned — so the block is now scoped to HTML page
+   * loads, where a scraper actually costs something.
+   */
+  if (wantsHtml && isSuspiciousBot(userAgent)) {
+    return withSecurityHeaders(
+      new NextResponse('Forbidden', { status: 403 }),
+      true,
+      request
+    );
   }
 
   // ── Search Param Validation ─────────────────────────────────────────────

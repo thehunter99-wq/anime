@@ -10,6 +10,7 @@ import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
 import { AdSlot, NativeBannerAd } from "@/components/ads";
 import AdUnderlays from "@/components/ad-underlays";
+import AdConfigDiagnostic from "@/components/ad-config-diagnostic";
 import { AdBlockDetector } from "@/components/adblock-detector";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { PreconnectOrigins, PrefetchLinks } from "@/components/prefetch-links";
@@ -318,6 +319,8 @@ export default async function RootLayout({
         {/* Underlays load afterInteractive so they never block first paint, and
             are chosen per route so the player stays usable. */}
         <AdUnderlays />
+        {/* Dev-only report of which ad env vars are unset. Renders null. */}
+        <AdConfigDiagnostic />
         {/* AdBlock detector - shows subtle overlay if extreme AdBlocker blocks ads */}
         <AdBlockDetector />
         {/* Service Worker for offline support and caching */}

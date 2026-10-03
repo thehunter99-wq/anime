@@ -86,36 +86,53 @@ export const ADSTERRA_KEY = envOr('NEXT_PUBLIC_ADSTERRA_KEY', '');
 export const IN_CONTENT_ENABLED = ADSTERRA_KEY.length > 0;
 
 /**
- * Popunder. Proxied through /assets/js/p-unit.js so an AdBlocker filtering
- * profitableratecpmnetwork.com cannot block it by hostname.
+ * Zone scripts, loaded DIRECTLY from the network's own domain.
  *
- * Production-only: Adsterra drops traffic from localhost and unverified
- * origins, so firing in dev only produces a console error.
+ * ── Why the first-party proxy was removed ────────────────────────────────────
+ * An earlier version rewrote `/assets/js/p-unit.js` (etc.) through next.config
+ * so a domain-name AdBlocker could not filter them. That backfired in
+ * production: there is no `public/assets/js/` directory, so those paths are not
+ * static files, and the CDN answered them with **403 Forbidden** — every ad unit
+ * on the site was dead at the network layer.
+ *
+ * Direct loading is also what Adsterra's own integration guidance specifies, and
+ * it matters for more than just the 403:
+ *   - the popunder/smartlink zones validate the referring document, and serving
+ *     the script from the operator's own domain produced a referrer the zones
+ *     treat as unverified, so impressions were dropped even when the script ran;
+ *   - no proxy hop means no extra DNS/TLS latency on the monetisation path.
+ *
+ * If you need AdBlocker resilience later, ship a real file under `public/` so the
+ * path actually resolves — a rewrite to an external host is not a static asset,
+ * and hosts are free to 403 those.
+ *
+ * The `*_ZONE_URL` names are kept because /diagnostics reports the zone URL so a
+ * failed fill can be told apart from a blocked script.
  */
-export const POPUNDER_URL = `${SITE_URL}/assets/js/p-unit.js`;
-
-/** Zone script the rewrite proxies. Surfaced by /diagnostics for verification. */
 export const POPUNDER_ZONE_URL = envOr('NEXT_PUBLIC_ADSTERRA_POPUNDER_URL', ZONE_POPUNDER);
-
-/** Social Bar. Proxied through /assets/js/s-unit.js. */
-export const SOCIAL_BAR_URL = `${SITE_URL}/assets/js/s-unit.js`;
 export const SOCIAL_BAR_ZONE_URL = envOr(
   'NEXT_PUBLIC_ADSTERRA_SOCIAL_BAR_URL',
   ZONE_SOCIAL_BAR
 );
-
-/**
- * Native Banner. Proxied through /assets/js/n-unit.js.
- *
- * SINGLETON: the loader binds to the first element whose id is
- * `container-<zone-hash>`, so mounting this twice on a page emits a duplicate
- * id and leaves the second slot permanently empty. It lives in the root layout.
- */
-export const NATIVE_BANNER_URL = `${SITE_URL}/assets/js/n-unit.js`;
 export const NATIVE_BANNER_ZONE_URL = envOr(
   'NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL',
   ZONE_NATIVE_BANNER
 );
+
+export const POPUNDER_URL = POPUNDER_ZONE_URL;
+export const SOCIAL_BAR_URL = SOCIAL_BAR_ZONE_URL;
+
+/**
+ * Native Banner. Singleton: the loader binds to the first element whose id is
+ * `container-<zone-hash>`, so mounting this twice on one page emits a duplicate
+ * id and leaves the second slot permanently empty. It lives in the root layout.
+ */
+export const NATIVE_BANNER_URL = NATIVE_BANNER_ZONE_URL;
+
+/** In-content loader (ssat.pro). Empty when no zone key is configured. */
+export const IN_CONTENT_LOADER_URL = ADSTERRA_KEY
+  ? `https://ssat.pro/cdn/client.js?key=${encodeURIComponent(ADSTERRA_KEY)}`
+  : '';
 
 /**
  * The zone hash is the first path segment after the hostname
@@ -135,19 +152,17 @@ export const NATIVE_BANNER_CONTAINER_ID = (() => {
   }
 })();
 
-/** In-content loader (ssat.pro). Empty when no zone key is configured. */
-export const IN_CONTENT_LOADER_URL = ADSTERRA_KEY
-  ? `${SITE_URL}/assets/js/in-content.js?key=${encodeURIComponent(ADSTERRA_KEY)}&format=auto`
-  : '';
-
 /**
- * Popunder is production-only.
+ * Popunder gating.
  *
- * Adsterra binds popunders to a verified referrer allowlist, so traffic from
- * localhost is silently dropped. Keeping it production-only avoids a pointless
- * request and a misleading console error in dev.
+ * Production by default, because Adsterra drops traffic from localhost and
+ * unverified origins, so a dev fire records nothing and only produces console
+ * noise. Set NEXT_PUBLIC_ADSTERRA_ALLOW_DEV=1 to force it on locally when
+ * debugging the integration.
  */
-export const POPUNDER_ENABLED = process.env.NODE_ENV === 'production';
+export const POPUNDER_ENABLED =
+  process.env.NODE_ENV === 'production' ||
+  envOr('NEXT_PUBLIC_ADSTERRA_ALLOW_DEV', '') === '1';
 
 /**
  * Smartlink behind the primary "Fast HD Download" button.

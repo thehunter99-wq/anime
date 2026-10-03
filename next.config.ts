@@ -19,34 +19,6 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     return [
-      {
-        source: '/assets/js/p-unit.js',
-        destination: 'https://pl31625875.profitableratecpmnetwork.com/be/f0/3c/bef03cbd6a8d7712fde3e921125ecc00.js',
-      },
-      {
-        source: '/assets/js/s-unit.js',
-        destination: 'https://pl31625876.profitableratecpmnetwork.com/77/43/d2/7743d209f9e5ab47329ac706ebe9fa56.js',
-      },
-      {
-        source: '/assets/js/n-unit.js',
-        destination: 'https://pl31625878.profitableratecpmnetwork.com/89898e7af070f78c4da937a6a83f13c7/invoke.js',
-      },
-      {
-        source: '/assets/js/in-content.js',
-        destination: 'https://ssat.pro/cdn/client.js',
-      },
-      {
-        source: '/assets/js/propa.js',
-        destination: 'https://propellerads.com/propa.js',
-      },
-      {
-        source: '/assets/js/adsterra.js',
-        destination: 'https://adsterra.com/adsterra.js',
-      },
-      {
-        source: '/assets/js/hilltop.js',
-        destination: 'https://hilltopads.com/hilltop.js',
-      },
       // IndexNow key verification file
       {
         source: '/:indexnowkey.txt',
