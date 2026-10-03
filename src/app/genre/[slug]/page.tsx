@@ -14,6 +14,7 @@ import Pagination from '@/components/pagination';
 import GenreNav from '@/components/genre-nav';
 import DetailJsonLd from '@/components/detail-json-ld';
 import { AdBanner } from '@/components/ads';
+import SmartlinkCta from '@/components/smartlink-cta';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -212,6 +213,9 @@ export default async function GenrePage({ params, searchParams }: Props) {
             <>
               {movies.length > 0 && <MovieGrid title={`${genre.label} Movies`} items={movies} />}
               <AdBanner />
+              {/* Smartlink CTA between the movies and anime rails, for visitors
+                  who browse a genre page without opening a title page. */}
+              <SmartlinkCta label={`Fast HD Download — ${genre.label}`} hint="Sponsored offer" />
               {anime.length > 0 && <MediaGrid title={`${genre.label} Anime`} items={anime} />}
               {tv.length > 0 && <TvGrid title={`${genre.label} TV Series`} items={tv} />}
             </>

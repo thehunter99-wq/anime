@@ -7,6 +7,7 @@ import Header from '@/components/header';
 import GenreNav from '@/components/genre-nav';
 import DetailJsonLd from '@/components/detail-json-ld';
 import { AdBanner } from '@/components/ads';
+import SmartlinkCta from '@/components/smartlink-cta';
 
 export const metadata: Metadata = {
   title: `Browse All Movie, TV & Anime Genres - ${SITE_NAME}`,
@@ -84,6 +85,8 @@ export default function GenresIndexPage() {
           <GenreNav />
 
           <AdBanner />
+
+          <SmartlinkCta label="Fast HD Download — Any Genre" hint="Sponsored offer" />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {GENRES.map((genre) => (

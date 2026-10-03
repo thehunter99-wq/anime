@@ -4,8 +4,20 @@ import { POPUNDER_CAP } from '@/config/ads';
  * Rolling-window trigger counter for the popunder.
  * 
  * Session-only storage (sessionStorage) - resets on tab close.
- * Adsterra allows ~1 popunder per 30 min per IP.
- * We enforce 1 per 30 min per session to be safe.
+ *
+ * ── Two rules, both enforced ─────────────────────────────────────────────────
+ * Adsterra allows ~1 popunder per 30 min per IP and bans somewhere past 3-5 per
+ * session. Both constraints are modelled here:
+ *
+ *   1. SPACING  (minGapMs)     - no two fires within 30 min of each other. This
+ *      is the half the network actually watches, and it is what a single-budget
+ *      counter did not express.
+ *   2. CEILING  (maxTriggers)  - a hard cap per session/tab, kept under the ban
+ *      line so a long visit cannot keep popping indefinitely.
+ *
+ * `isPopunderCapped` therefore answers "may it fire NOW", not "has it ever
+ * fired". A stale implementation that only counted against a rolling window let
+ * a visitor earn nothing for 30 minutes at a time even on a two-hour visit.
  */
 function readWindow(): number[] {
   try {
@@ -35,12 +47,20 @@ function activeTriggers(now: number): number[] {
 /** True when the popunder has already fired its budget and must stay hidden. */
 export function isPopunderCapped(now = Date.now()): boolean {
   if (typeof window === 'undefined') return false;
-  return activeTriggers(now).length >= POPUNDER_CAP.maxTriggers;
+  const triggers = activeTriggers(now);
+
+  // Ceiling: the session has already fired its whole budget.
+  if (triggers.length >= POPUNDER_CAP.maxTriggers) return true;
+
+  // Spacing: the most recent fire is still inside the gap, so firing now would
+  // produce two pops back to back - the exact pattern networks flag.
+  const last = triggers.length > 0 ? Math.max(...triggers) : 0;
+  return last > 0 && now - last < POPUNDER_CAP.minGapMs;
 }
 
 /**
  * Records a trigger and reports whether the popunder may show again.
- * Returns false once the cap is reached.
+ * Returns false once the session ceiling is reached.
  */
 export function recordPopunderTrigger(now = Date.now()): boolean {
   const remaining = [...activeTriggers(now), now];

@@ -211,7 +211,7 @@ export function checkAdsterra(): CheckResult {
   return {
     id: 'adsterra',
     label: 'Adsterra In-Content Ads',
-    detail: `Zone key set — loader will request ssat.pro/cdn/client.js?key=${key.slice(0, 6)}…`,
+    detail: `Zone key set (${key.slice(0, 6)}…). Slots fill from pl*.profitableratecpmnetwork.com/<hash>/invoke.js, which scans the DOM for container-<hash>. This status check cannot confirm a fill — check the Adsterra dashboard for impressions.`,
     status: 'ok',
   };
 }
@@ -273,14 +273,14 @@ export const checkAdsterraSocialBar = () =>
   checkAdsterraScript(
     getAdsterraSocialBarUrl(),
     'Adsterra Social Bar',
-    'loads ~1.2s after each page renders'
+    'loads ~2.5s after page render, once per 24h, top placement'
   );
 
 export const checkAdsterraPopunder = () =>
   checkAdsterraScript(
     getAdsterraPopunderUrl(),
     'Adsterra Popunder',
-    'loads ~4.5s after each page renders',
+    'loads ~12s after page render, then 30min spacing / 4 per session',
     true
   );
 

@@ -7,6 +7,7 @@ import Header from '@/components/header';
 import MediaCarousel from '@/components/media-carousel';
 import MediaGrid from '@/components/media-grid';
 import { AdBanner } from '@/components/ads';
+import SmartlinkCta from '@/components/smartlink-cta';
 
 /**
  * Anime hub.
@@ -65,6 +66,9 @@ export default async function AnimeHubPage() {
               {trending.length > 0 && <MediaCarousel title="Trending Anime" items={trending} />}
               {topRated.length > 0 && <MediaGrid title="Top Rated Anime" items={topRated} />}
               <AdBanner />
+              {/* Smartlink entry point for visitors who browse but never open a
+                  title's detail page — the only other place the smartlink appears. */}
+              <SmartlinkCta label="Fast HD Download — Popular Anime" hint="Sponsored offer" />
               {upcoming.length > 0 && <MediaGrid title="Latest Releases" items={upcoming} />}
             </>
           )}

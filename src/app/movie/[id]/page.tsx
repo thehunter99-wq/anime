@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
 import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
+import SmartlinkCta from '@/components/smartlink-cta';
 import { getDownloadUrl } from '@/lib/embed';
 import { pingIndexNowForContent } from '@/lib/indexnow';
 
@@ -241,6 +242,11 @@ export default async function MoviePage({ params }: Props) {
               directUrl={getDownloadUrl('movie', movie.id, 1, 1)}
               isManga={false}
             />
+
+            {/* Second Smartlink entry point on a detail page. `DownloadButtons`
+                already carries one inside its red button; this is the wider,
+                labelled variant for a visitor who does not act on the first. */}
+            <SmartlinkCta label={`Fast HD Download — ${title}`} hint="Sponsored offer" className="mt-1" />
 
             {/* Reserved height is declared on the slot, so a blocked ad script
                 cannot shift the recommended rail below it. */}

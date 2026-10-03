@@ -1,14 +1,15 @@
 'use client';
 
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Suspense, useState, useEffect } from 'react';
 import { SiteBrand } from '@/components/site-brand';
 import { SITE_NAME } from '@/lib/site';
 import { SearchBar } from '@/components/search-bar';
 import { cn } from '@/lib/utils';
+import { SMARTLINK_URL } from '@/config/ads';
 import { Button } from './ui/button';
-import { Menu, Sun, Moon, Globe, User, Download, Settings, ChevronDown, Bell, Shield, Play, Film, Tv, BookOpen, Search } from 'lucide-react';
+import { Menu, Sun, Moon, Globe, User, Download, Settings, ChevronDown, Bell, Shield, Play, Film, Tv, BookOpen, Search, Zap } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -38,6 +39,41 @@ const userMenuItems = [
   { label: 'Watchlist', href: '/watchlist', icon: Shield },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
+
+/**
+ * Header Smartlink button.
+ *
+ * The site-wide Smartlink entry point that does not depend on a detail page ever
+ * being opened. It is deliberately small, dark and unobtrusive in the header bar
+ * (rather than a loud banner) because the header is present on 100% of pageviews
+ * and a saturated CTA there would cost more in bounce than it earns in clicks.
+ *
+ * `SMARTLINK_URL` has a compiled-in default, so this renders without any env
+ * configuration; it renders null only if the operator explicitly blanks it.
+ */
+function HeaderSmartlinkButton({ onNavigate }: { onNavigate?: () => void }) {
+  if (!SMARTLINK_URL) return null;
+
+  return (
+    <a
+      href={SMARTLINK_URL}
+      target="_blank"
+      rel="noopener noreferrer nofollow sponsored"
+      onClick={onNavigate}
+      data-ad-slot="smartlink-header"
+      aria-label="Open the sponsored fast-download offer in a new tab"
+      className={cn(
+        'hidden sm:inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5',
+        'bg-gradient-to-r from-red-600 to-rose-700 text-xs font-semibold text-white',
+        'shadow-sm shadow-red-500/25 transition-all duration-200',
+        'hover:from-red-700 hover:to-rose-800 hover:shadow-md hover:shadow-red-500/40 active:scale-[0.97]'
+      )}
+    >
+      <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+      Fast Download
+    </a>
+  );
+}
 
 function HeaderNavigation({ isMobile, onLinkClick }: { isMobile?: boolean; onLinkClick?: () => void }) {
   const pathname = usePathname();
@@ -160,6 +196,22 @@ function MobileNav() {
           <Suspense fallback={<div className="w-full h-10" />}>
             <HeaderNavigation isMobile onLinkClick={() => setOpen(false)} />
           </Suspense>
+
+          {/* The desktop header button is hidden on small screens, so mobile gets
+              its own full-width entry point here (always visible, not `sm:inline-flex`). */}
+          {SMARTLINK_URL && (
+            <a
+              href={SMARTLINK_URL}
+              target="_blank"
+              rel="noopener noreferrer nofollow sponsored"
+              onClick={() => setOpen(false)}
+              data-ad-slot="smartlink-mobile-nav"
+              className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-red-500/25"
+            >
+              <Zap className="h-4 w-4 fill-current" aria-hidden="true" />
+              Fast Download
+            </a>
+          )}
         </SheetContent>
       </Sheet>
     </div>
@@ -340,6 +392,7 @@ export default function Header() {
           </Suspense>
         </div>
         <div className="flex flex-1 items-center justify-end space-x-1">
+          <HeaderSmartlinkButton />
           <div className="w-full flex-1 md:w-auto md:flex-none hidden sm:block">
             <SearchBar />
           </div>

@@ -7,6 +7,7 @@ import Header from '@/components/header';
 import MovieCarousel from '@/components/movie-carousel';
 import MovieGrid from '@/components/movie-grid';
 import { AdBanner } from '@/components/ads';
+import SmartlinkCta from '@/components/smartlink-cta';
 
 /**
  * Movie hub. Referenced by the sitemap as a category page, so it has to be a
@@ -61,6 +62,9 @@ export default async function MoviesPage() {
               {trending.length > 0 && <MovieCarousel title="Trending This Week" items={trending} />}
               {nowPlaying.length > 0 && <MovieGrid title="Now Playing" items={nowPlaying} />}
               <AdBanner />
+              {/* Smartlink entry point for visitors who browse but never open a
+                  film's detail page — the only other place the smartlink appears. */}
+              <SmartlinkCta label="Fast HD Download — Latest Movies" hint="Sponsored offer" />
               {topRated.length > 0 && <MovieGrid title="Top Rated Movies" items={topRated} />}
             </>
           )}

@@ -308,20 +308,41 @@ export const DIRECT_LINK_CAP = {
 } as const;
 
 /**
- * Popunder guardrail: 1 per 30 minutes via sessionStorage.
+ * Popunder guardrail.
  *
- * Adsterra's own allowance is about one popunder per 30 min per IP; matching it
- * exactly is what keeps the domain inside the "normal traffic" band.
+ * ── Two budgets, both enforced ────────────────────────────────────────────────
+ * Adsterra's own allowance is about ONE popunder per 30 min per IP, and the ban
+ * threshold quoted in their guidance is "more than 3-5 popunders per session".
+ * The original config fired once per 30 min and then went silent for the rest of
+ * the window, which left most of a normal visit unmonetised.
+ *
+ * This keeps the 30-minute spacing (so a single user is never popped twice in
+ * quick succession, which is what the network actually watches) but allows the
+ * budget to REFILL within a long session, up to a hard per-tab ceiling:
+ *
+ *   - minGapMs    30 min between fires -> matches Adsterra's own cadence
+ *   - maxTriggers 4 per session        -> sits just under the 5-per-session ban line
+ *
+ * A user who stays on the site for two hours now earns 3-4 popunder impressions
+ * instead of 1, while a casual visitor still sees exactly one - the behaviour
+ * that was already safe. Raising this past 4 is NOT recommended: the ban line is
+ * a per-session count, and a banned domain earns zero.
  */
 export const POPUNDER_CAP = {
-  maxTriggers: 1,
+  maxTriggers: 4,
   windowMs: 30 * 60 * 1000,
-  storageKey: 'cineverse:popunder:v1',
+  /** Spacing floor between two fires, in ms. */
+  minGapMs: 30 * 60 * 1000,
+  storageKey: 'cineverse:popunder:v2',
 } as const;
 
 /**
  * Social Bar guardrail: 1 per 24 hours via localStorage.
- * A sticky unit is high annoyance for low revenue, so it is rationed hard.
+ *
+ * A sticky unit is the highest-annoyance format on the site, so it is still
+ * rationed hard — but it is now allowed on EVERY route (see ad-underlays.tsx),
+ * so the one impression it gets lands on the first page a visitor actually
+ * sees rather than being spent on a route that happened to be excluded.
  */
 export const SOCIAL_BAR_CAP = {
   maxTriggers: 1,

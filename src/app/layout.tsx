@@ -10,6 +10,7 @@ import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
 import { BannerSlots, NativeBannerAd } from "@/components/ads";
 import AdUnderlays from "@/components/ad-underlays";
+import SmartlinkCta from "@/components/smartlink-cta";
 import AdConfigDiagnostic from "@/components/ad-config-diagnostic";
 import { AdBlockDetector } from "@/components/adblock-detector";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
@@ -315,8 +316,19 @@ export default async function RootLayout({
               the loader binds to the first element matching its container id.
               Every repeatable position uses BannerSlots/AdSlot instead. Both
               declare their own reserved height so a blocked script cannot
-              cause CLS. */}
+              cause CLS.
+
+              Being in the root layout is exactly what places it on EVERY page —
+              there is no per-route wiring to forget. */}
           <NativeBannerAd label="Advertisement" />
+
+          {/* Smartlink rail on every page. It sits above the footer slot so it is
+              reachable from the browse surface, not only from a detail page's
+              download button. Renders null when no smartlink URL is configured. */}
+          <div className="py-4">
+            <SmartlinkCta />
+          </div>
+
           <BannerSlots positions={['footer']} />
         </div>
         <Footer />

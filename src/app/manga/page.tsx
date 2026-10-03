@@ -7,6 +7,7 @@ import Header from '@/components/header';
 import MediaCarousel from '@/components/media-carousel';
 import MediaGrid from '@/components/media-grid';
 import { AdBanner } from '@/components/ads';
+import SmartlinkCta from '@/components/smartlink-cta';
 
 /**
  * Manga hub at `/manga`.
@@ -58,6 +59,7 @@ export default async function MangaHubPage() {
               {popular.length > 0 && <MediaGrid title="Popular Manga" items={popular} />}
               <AdBanner />
               {trending.length > 0 && <MediaCarousel title="Trending Manga" items={trending} />}
+              <SmartlinkCta label="Fast HD Download — Manga Bundle" hint="Sponsored offer" />
               {topRated.length > 0 && <MediaGrid title="Top Rated Manga" items={topRated} />}
             </>
           )}

@@ -146,11 +146,21 @@ function waitForEngagementAfterDwell(minDwellMs: number): Promise<void> {
  * Highest-earning unit after the Smartlink, and the one most likely to get a
  * domain banned, so it is deliberately the most constrained:
  *   - production only (Adsterra drops unverified referrers)
- *   - one per 30 min via sessionStorage, matching Adsterra's own allowance
- *   - 30s minimum dwell before the script is even injected
+ *   - a 30-minute spacing floor between fires plus a per-session ceiling of 4,
+ *     both enforced in `lib/popunder-cap.ts`, so a long visit keeps earning while
+ *     a casual one still sees a single pop
+ *   - a minimum dwell before the script is even injected
  *   - never armed on a watch page when a Direct Link is configured
+ *
+ * ── Why this takes a `rearmKey` ──────────────────────────────────────────────
+ * The budget now REFILLS: after the 30-minute gap a returning visitor is
+ * eligible again, but with `useEffect(…, [])` the component only ever evaluated
+ * that once, at mount, and the script tag stayed absent for the whole session.
+ * Re-evaluating on each client-side navigation is what actually collects the
+ * second and later impressions the cap permits. The script's own `id` makes
+ * `next/script` a no-op once it has loaded, so this cannot double-inject.
  */
-export function AdsterraPopunder() {
+export function AdsterraPopunder({ rearmKey }: { rearmKey?: string } = {}) {
   const [ready, setReady] = useState(false);
   const armedRef = useRef(false);
 
@@ -158,6 +168,13 @@ export function AdsterraPopunder() {
     if (!POPUNDER_ENABLED) return;
     if (!POPUNDER_URL) return;
     if (isBotRequest()) return;
+
+    // Reset per navigation: `true` here only means "this route already fired",
+    // never "the session is over".
+    armedRef.current = false;
+    setReady(false);
+
+    // Spacing/ceiling re-checked at mount; a capped visitor short-circuits here.
     if (isPopunderCapped()) return;
 
     let cancelled = false;
@@ -166,8 +183,8 @@ export function AdsterraPopunder() {
       await waitForEngagementAfterDwell(AD_DELAYS.popunder);
       if (cancelled || armedRef.current) return;
 
-      // Re-check at fire time: a client-side navigation may have consumed the
-      // budget while this page was open.
+      // Re-check at fire time: the dwell may have outlived the 30-minute gap, or
+      // a navigation may have consumed the budget while this page was open.
       if (!isPopunderCapped()) {
         armedRef.current = true;
         recordPopunderTrigger();
@@ -178,7 +195,7 @@ export function AdsterraPopunder() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [rearmKey]);
 
   if (!ready) return null;
 
@@ -205,13 +222,22 @@ export function AdsterraPopunder() {
  * Capped at one per 24 hours: it is the highest-annoyance unit on the site for
  * comparatively little revenue, so it is rationed hard.
  *
- * POSITION IS NOT SET HERE ON PURPOSE. The zone script reads its own
- * `placementKey` config and positions itself (verified in the live script:
- * `placementKey`, `setCreativePosition`, `createChildPlacement`). Forcing it
- * with `!important` CSS was tried and reverted — it fought the script's own
- * inline positioning and the broad selector that was required also matched
- * every fixed-position modal, dropdown and toast on the site. Choosing bottom
- * placement is a zone setting in the Adsterra dashboard.
+ * ── Showing it at the TOP ────────────────────────────────────────────────────
+ * The unit is now asked to render at the top of the viewport rather than the
+ * default bottom. Two reasons:
+ *
+ *   1. The bottom strip is where every player puts its own controls and every
+ *      phone puts its browser chrome, so a bottom-pinned bar sits on top of the
+ *      thing the visitor came to use. At the top it is out of the playback area.
+ *   2. `placementKey` is the zone's own documented knob for this (verified in
+ *      the live script: `placementKey`, `setCreativePosition`,
+ *      `createChildPlacement`). Driving the position through the script's own
+ *      config is the supported path; the `!important` CSS override that was tried
+ *      earlier fought the script's inline positioning and matched unrelated fixed
+ *      elements, and was correctly reverted.
+ *
+ * NOTE: if the zone has a fixed placement in the Adsterra dashboard, that
+ * setting wins. Set the zone to "Top" there as well for the two to agree.
  */
 export function AdsterraSocialBar() {
   const [ready, setReady] = useState(false);
@@ -248,6 +274,12 @@ export function AdsterraSocialBar() {
       src={SOCIAL_BAR_URL}
       strategy="lazyOnload"
       async
+      /**
+       * `placementKey` asks the zone for its top strip. Harmless if the zone
+       * ignores it — the script falls back to its own dashboard setting.
+       */
+      data-placement-key="top"
+      data-placement="top"
       onError={() =>
         console.error(
           `[adsterra] social bar failed to load from ${SOCIAL_BAR_URL}. Check that the zone is active and that CSP script-src/connect-src allow *.profitableratecpmnetwork.com.`
