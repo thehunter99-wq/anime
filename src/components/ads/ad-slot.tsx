@@ -95,21 +95,47 @@ export function AdSlot({ className, label, format = 'auto' }: AdSlotProps) {
         className="adsterra relative z-10 w-full"
         suppressHydrationWarning
       />
-
-      <Script
-        id={`adsterra-loader-${slotId}`}
-        src={IN_CONTENT_ZONE_URL}
-        strategy="lazyOnload"
-        async
-        onError={() =>
-          console.error(
-            `[adsterra] in-content loader failed to load from ${IN_CONTENT_ZONE_URL}. ` +
-              'Check the zone is active and that CSP script-src allows ' +
-              '*.profitableratecpmnetwork.com.'
-          )
-        }
-      />
     </AdFrame>
+  );
+}
+
+/**
+ * The in-content zone loader, injected ONCE for the whole page.
+ *
+ * ── Why this is not inside AdSlot ────────────────────────────────────────────
+ * It used to be, with `id={`adsterra-loader-${slotId}`}`. That was a real bug and
+ * it produced the reported crash:
+ *
+ *   - every slot injected the SAME src under a DIFFERENT id, so a page with four
+ *     slots created four script tags for one zone;
+ *   - `useId` output is not stable across client-side navigations, so on any
+ *     route change React unmounted the old <Script> and mounted a new one. The ad
+ *     script had already captured a reference to that DOM node, so detaching it
+ *     produced `Uncaught TypeError: Cannot read properties of null (reading
+ *     'parentNode')` — the zone script dying mid-fill, which is exactly the
+ *     "ad does not show" symptom.
+ *
+ * A single tag with a fixed id, mounted in the root layout, removes the churn
+ * entirely: React never replaces it, so nothing the ad script holds is ever
+ * detached. The zone fills every container it finds, so one tag serves all slots.
+ */
+export function InContentLoader() {
+  if (!ADSTERRA_KEY || !IN_CONTENT_ZONE_URL) return null;
+
+  return (
+    <Script
+      id="adsterra-in-content-loader"
+      src={IN_CONTENT_ZONE_URL}
+      strategy="lazyOnload"
+      async
+      onError={() =>
+        console.error(
+          `[adsterra] in-content loader failed to load from ${IN_CONTENT_ZONE_URL}. ` +
+            'Check the zone is active and that CSP script-src allows ' +
+            '*.profitableratecpmnetwork.com.'
+        )
+      }
+    />
   );
 }
 

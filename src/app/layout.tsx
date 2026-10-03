@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
-import { BannerSlots, NativeBannerAd } from "@/components/ads";
+import { BannerSlots, InContentLoader, NativeBannerAd } from "@/components/ads";
 import AdUnderlays from "@/components/ad-underlays";
 import SmartlinkCta from "@/components/smartlink-cta";
 import AdConfigDiagnostic from "@/components/ad-config-diagnostic";
@@ -306,6 +306,16 @@ export default async function RootLayout({
         )}
       >
         <DisclaimerModal />
+
+        {/* The in-content zone loader, mounted exactly once for the whole app.
+            It used to be rendered inside each AdSlot, which meant four script
+            tags for one zone on a four-slot page, and React replaced them on
+            every client-side navigation — detaching a node the ad script already
+            held and killing the fill with a `parentNode` TypeError. One fixed-id
+            tag in the root layout is never unmounted. The zone fills every
+            container it finds, so this still serves all slots. */}
+        <InContentLoader />
+
         {/* Top of every page, above the page's own content. */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
           <BannerSlots positions={['header']} />

@@ -5,7 +5,7 @@
  * (in-content slots, native banner, site-wide units) means a page that only
  * needs a banner does not pull the popunder's dwell logic into its bundle.
  */
-export { AdSlot, type AdSlotProps } from './ad-slot';
+export { AdSlot, type AdSlotProps, InContentLoader } from './ad-slot';
 export { NativeBannerAd } from './native-banner';
 export { BannerSlots } from './banner-slots';
 export { AdsterraPopunder, AdsterraSocialBar } from './global-ads';
