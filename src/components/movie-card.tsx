@@ -9,21 +9,28 @@ import { PlayCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { getTMDBImageUrl } from '@/lib/tmdb';
 import { languageLabel } from '@/lib/languages';
+import { getRandomSeoAnchor } from '@/components/recommended-movies-enhanced';
 
 interface MovieCardProps {
   item: Movie;
+  /** Optional SEO-optimized anchor text for the link (targets long-tail queries) */
+  seoAnchor?: string;
+  /** Whether to use SEO anchor for the main title link */
+  useSeoAnchor?: boolean;
 }
 
-export default function MovieCard({ item }: MovieCardProps) {
+export default function MovieCard({ item, seoAnchor, useSeoAnchor = false }: MovieCardProps) {
   const title = item.title;
   const posterUrl = getTMDBImageUrl(item.poster_path);
   const movieUrl = moviePath(item.id);
   const year = item.release_date ? new Date(item.release_date).getFullYear() : 'N/A';
+  const dynamicAnchor = seoAnchor ?? getRandomSeoAnchor(title, item.release_date);
+  const displayTitle = useSeoAnchor ? dynamicAnchor : title;
 
   return (
       <Card className="group w-full overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 border-transparent hover:border-primary/50">
         <CardContent className="relative p-0">
-          <Link href={movieUrl} className="block aspect-[2/3] w-full">
+          <Link href={movieUrl} className="block aspect-[2/3] w-full" aria-label={dynamicAnchor}>
             <div className="relative h-full w-full">
               {posterUrl ? (
                 <Image
@@ -32,7 +39,7 @@ export default function MovieCard({ item }: MovieCardProps) {
                   fill
                   className="rounded-t-lg object-cover"
                   sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
-                  unoptimized
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full bg-muted rounded-t-lg flex items-center justify-center">
@@ -50,20 +57,20 @@ export default function MovieCard({ item }: MovieCardProps) {
             </div>
           </Link>
           <div className="p-3 space-y-2">
-            <Link href={movieUrl}>
-              <h3 className="truncate font-semibold text-foreground hover:text-primary transition-colors">{title}</h3>
+            <Link href={movieUrl} aria-label={dynamicAnchor}>
+              <h3 className="truncate font-semibold text-foreground hover:text-primary transition-colors">{displayTitle}</h3>
             </Link>
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <span>{year}</span>
               {item.vote_average > 0 && <><span>&bull;</span><span>{item.vote_average.toFixed(1)} ★</span></>}
             </div>
              <div className="pt-1">
-               <Button asChild size="sm" className="w-full">
-                  <Link href={movieUrl}>
-                    <PlayCircle className="mr-2 h-4 w-4" />
-                    Watch Now
-                  </Link>
-               </Button>
+                <Button asChild size="sm" className="w-full" aria-label={dynamicAnchor}>
+                   <Link href={movieUrl}>
+                     <PlayCircle className="mr-2 h-4 w-4" />
+                     Watch Now
+                   </Link>
+                </Button>
             </div>
           </div>
         </CardContent>

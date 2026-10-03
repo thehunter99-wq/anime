@@ -1,14 +1,18 @@
 'use client';
 
 import Script from 'next/script';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 import {
   AD_DELAYS,
+  MIN_AD_DELAY,
+  INTERACTION_EVENTS,
   POPUNDER_ENABLED,
   POPUNDER_URL,
   SOCIAL_BAR_URL,
 } from '@/config/ads';
+import { isPopunderCapped, recordPopunderTrigger } from '@/lib/popunder-cap';
+import { isSocialBarCapped, recordSocialBarTrigger } from '@/lib/social-bar-cap';
 
 export { AdSlot as AdBanner, AdSlot, NativeBannerAd } from '@/components/ad-slot';
 
@@ -24,35 +28,91 @@ declare global {
   }
 }
 
-/**
- * Underlay scripts (popunder + social bar).
- *
- * STRATEGY: both are `lazyOnload`, not `afterInteractive`.
- *
- * `afterInteractive` injects the script as soon as hydration begins, which puts
- * third-party parser work on the critical path and inflates TBT — exactly the
- * metric that decides whether a page passes Core Web Vitals. `lazyOnload` defers
- * until the browser is idle after load, by which point LCP and TBT have already
- * been committed. The scripts still fire before most meaningful scroll depth, so
- * revenue is largely unaffected.
- *
- * For crawlers this is a non-issue: Googlebot renders JS and waits for network
- * idle, so the impressions still register, and the tags themselves are ordinary
- * script tags in the DOM rather than anything that blocks indexing.
- *
- * Each unit is also gated by its own delay, so a single page view never fires
- * both underlays at once — networks penalise that pattern.
- *
- * A failed load only logs: every ad unit here is decorative, and the video
- * player is a sibling element that is never gated on any of this resolving.
- */
+function isBotRequest(): boolean {
+  if (typeof window === 'undefined') return false;
+  const meta = document.querySelector('meta[name="x-is-bot"]');
+  return meta?.getAttribute('content') === '1';
+}
+
+function waitForInteractionOrIdle(minDelay: number): Promise<void> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    let interactionHandled = false;
+
+    const resolveOnce = () => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve();
+      }
+    };
+
+    const handleInteraction = () => {
+      if (!interactionHandled) {
+        interactionHandled = true;
+        setTimeout(resolveOnce, 50);
+      }
+    };
+
+    const cleanup = () => {
+      INTERACTION_EVENTS.forEach((event) => {
+        window.removeEventListener(event, handleInteraction);
+      });
+    };
+
+    INTERACTION_EVENTS.forEach((event) => {
+      window.addEventListener(event, handleInteraction, { passive: true });
+    });
+
+    const scheduleIdle = () => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => {
+          if (!interactionHandled) resolveOnce();
+        }, { timeout: minDelay });
+      } else {
+        setTimeout(() => {
+          if (!interactionHandled) resolveOnce();
+        }, minDelay);
+      }
+    };
+
+    setTimeout(resolveOnce, minDelay + 3000);
+    scheduleIdle();
+  });
+}
+
 export function AdsterraPopunder() {
   const [ready, setReady] = useState(false);
+  const mountedRef = useRef(false);
+  const firedRef = useRef(false);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     if (!POPUNDER_ENABLED) return;
-    const timer = setTimeout(() => setReady(true), AD_DELAYS.popunder);
-    return () => clearTimeout(timer);
+    if (isBotRequest()) return;
+    if (isPopunderCapped()) return;
+
+    let cancelled = false;
+
+    const initAd = async () => {
+      await waitForInteractionOrIdle(AD_DELAYS.popunder);
+
+      if (cancelled || !mountedRef.current) return;
+
+      if (!isPopunderCapped() && !firedRef.current) {
+        firedRef.current = true;
+        setReady(true);
+        recordPopunderTrigger();
+      }
+    };
+
+    initAd();
+
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+    };
   }, []);
 
   if (!ready) return null;
@@ -70,10 +130,33 @@ export function AdsterraPopunder() {
 
 export function AdsterraSocialBar() {
   const [ready, setReady] = useState(false);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setReady(true), AD_DELAYS.socialBar);
-    return () => clearTimeout(timer);
+    mountedRef.current = true;
+
+    if (isBotRequest()) return;
+    if (isSocialBarCapped()) return;
+
+    let cancelled = false;
+
+    const initAd = async () => {
+      await waitForInteractionOrIdle(AD_DELAYS.socialBar);
+
+      if (cancelled || !mountedRef.current) return;
+
+      if (!isSocialBarCapped()) {
+        setReady(true);
+        recordSocialBarTrigger();
+      }
+    };
+
+    initAd();
+
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+    };
   }, []);
 
   if (!ready) return null;

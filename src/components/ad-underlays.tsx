@@ -24,6 +24,10 @@ import { AdsterraPopunder, AdsterraSocialBar } from '@/components/ads';
  *
  * Browse and detail pages keep both underlays, which is where impressions are
  * cheapest and the visitor is least likely to be interrupted mid-playback.
+ *
+ * Both underlays now have their own frequency caps enforced internally:
+ * - Popunder: 1 per 30 minutes (sessionStorage)
+ * - Social Bar: 1 per 24 hours (localStorage)
  */
 export default function AdUnderlays() {
   const pathname = usePathname();

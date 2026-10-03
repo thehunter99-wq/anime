@@ -1,25 +1,58 @@
-import { notFound } from 'next/navigation';
+﻿import { notFound } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { Metadata } from 'next';
 
-import { fetchTVShowById, getTMDBImageUrl } from '@/lib/tmdb';
+import { fetchTVShowById, fetchPopularTv, getTMDBImageUrl, isTMDBUnavailable } from '@/lib/tmdb';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
-import { tvPath, watchPath, absoluteUrl } from '@/lib/routes';
-import { buildDetailMetadata, buildMediaJsonLd } from '@/lib/seo';
-import JsonLd from '@/components/json-ld-script';
+import { tvPath, tvSeasonPath, watchPath, absoluteUrl } from '@/lib/routes';
+import {
+  buildDetailMetadata,
+  buildMediaJsonLd,
+  buildVideoObject,
+  buildBreadcrumbList,
+  buildFAQSchema,
+} from '@/lib/seo';
+import DetailJsonLd from '@/components/detail-json-ld';
+import { RatingBadge } from '@/components/rating-badge';
 import Header from '@/components/header';
+import TvCarousel from '@/components/tv-carousel';
+import RecommendedTv from '@/components/recommended-tv';
+import TrendingInGenreTv from '@/components/trending-in-genre-tv';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
 import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 import { getDownloadUrl } from '@/lib/embed';
+import { pingIndexNowForContent } from '@/lib/indexnow';
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
 export const revalidate = 3600;
+
+/** Additive generation: any id a rail or the sitemap links resolves on demand. */
+export const dynamicParams = true;
+
+/**
+ * `fetchTVShowById` returns `null` both for "no such show" and for "TMDB did not
+ * answer". Only the first may become `notFound()`: that response is cached by
+ * ISR, so an outage must not be allowed to mark real shows as missing. Throwing
+ * yields a 5xx, which Next does not cache, so the next request retries.
+ */
+async function resolveShow(id: number) {
+  if (!Number.isFinite(id)) notFound();
+
+  const show = await fetchTVShowById(id);
+  if (show) return show;
+
+  if (isTMDBUnavailable()) {
+    throw new Error(`TMDB unavailable while resolving TV show ${id}`);
+  }
+  notFound();
+}
 
 const toId = (raw: string): number => Number.parseInt(raw, 10);
 const yearOf = (date: string | null | undefined): number | null =>
@@ -30,8 +63,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const id = toId(raw);
   if (!Number.isFinite(id)) return { title: 'Not Found' };
 
-  const show = await fetchTVShowById(id);
-  if (!show) return { title: 'Not Found' };
+  const show = await resolveShow(id);
+
+  // Trigger IndexNow ping for fast indexing during ISR revalidation (fire-and-forget)
+  pingIndexNowForContent('tv', show.id).catch(console.error);
 
   return buildDetailMetadata({
     title: show.name,
@@ -48,29 +83,76 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TvPage({ params }: Props) {
   const { id: raw } = await params;
   const id = toId(raw);
-  if (!Number.isFinite(id)) notFound();
 
-  const show = await fetchTVShowById(id);
-  if (!show) notFound();
+  const show = await resolveShow(id);
+
+  // Trigger IndexNow ping for fast indexing (fire-and-forget)
+  pingIndexNowForContent('tv', show.id).catch(console.error);
 
   const title = show.name;
   const year = yearOf(show.first_air_date);
   const backdrop = getTMDBImageUrl(show.backdrop_path ?? show.poster_path, 'original');
   const poster = getTMDBImageUrl(show.poster_path, 'w500');
 
-  const jsonLd = buildMediaJsonLd({
-    type: 'TVSeries',
-    title,
-    description: show.overview,
-    image: backdrop ?? undefined,
-    url: absoluteUrl(tvPath(show.id), SITE_URL),
-    datePublished: show.first_air_date || null,
-    genres: show.genres?.map((g) => g.name),
-    numberOfSeasons: show.number_of_seasons ?? null,
-    numberOfEpisodes: show.number_of_episodes ?? null,
-    // Omitted until ratings are visible on the page. See src/lib/seo.ts.
-    rating: null,
-  });
+  // Extra internal links out of this page. Fetched here rather than inside a
+  // component so the rail is part of the server render and Googlebot sees the
+  // anchors in the HTML, not after hydration.
+  const [trendingTv] = await Promise.all([fetchPopularTv()]);
+
+  /**
+   * Seasons that get a landing page, from the payload already in hand.
+   *
+   * No extra request: `/tv/{id}` returns the full `seasons` array. Season 0 is
+   * filtered out because TMDB uses it for specials and extras, which have no
+   * numbering anyone searches for and no page to link to — the middleware guard
+   * 404s `/tv/{id}/season-0` deliberately.
+   *
+   * These links are the only crawl path from the series page to the season pages,
+   * and from there to the episode pages, so the whole cluster is reachable from
+   * one fetch of `/tv/{id}`.
+   */
+  const seasons = (show.seasons ?? [])
+    .filter((season) => Number.isFinite(season.season_number) && season.season_number >= 1)
+    .sort((a, b) => a.season_number - b.season_number);
+
+  const jsonLdNodes = [
+    buildMediaJsonLd({
+      type: 'TVSeries',
+      title,
+      description: show.overview,
+      image: backdrop ?? undefined,
+      url: absoluteUrl(tvPath(show.id), SITE_URL),
+      datePublished: show.first_air_date || null,
+      genres: show.genres?.map((g) => g.name),
+      numberOfSeasons: show.number_of_seasons ?? null,
+      numberOfEpisodes: show.number_of_episodes ?? null,
+      // Emitted alongside the `<RatingBadge>` below, which shows the same numbers.
+      rating: {
+        voteAverage: show.vote_average,
+        voteCount: show.vote_count ?? null,
+      },
+    }),
+    buildVideoObject({
+      name: `Watch ${title}${year ? ` (${year})` : ''} full series online`,
+      description: show.overview,
+      thumbnailUrl: poster ?? backdrop,
+      uploadDate: show.first_air_date || null,
+      embedUrl: absoluteUrl(watchPath('tv', show.id), SITE_URL),
+    }),
+    buildBreadcrumbList({
+      siteUrl: SITE_URL,
+      // `/tv` is a real, crawlable series index.
+      sectionName: 'TV Shows',
+      sectionUrl: `${SITE_URL}/tv`,
+      title,
+    }),
+    buildFAQSchema({
+      title,
+      year,
+      isSeries: true,
+      isAnime: false,
+    }),
+  ];
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -101,6 +183,7 @@ export default async function TvPage({ params }: Props) {
                 fill
                 sizes="(max-width: 640px) 160px, 208px"
                 className="object-cover"
+                loading="lazy"
               />
             </div>
           )}
@@ -117,6 +200,12 @@ export default async function TvPage({ params }: Props) {
                 <span>
                   {SITE_NAME} &middot; Free streaming
                 </span>
+                {/* Must stay in sync with `aggregateRating` in the JSON-LD below. */}
+                <RatingBadge
+                  average={show.vote_average}
+                  votes={show.vote_count}
+                  label="TMDB"
+                />
               </div>
             </div>
 
@@ -152,9 +241,45 @@ export default async function TvPage({ params }: Props) {
             <AdSlot className="mt-2" />
           </div>
         </div>
+
+        {/* Crawl paths: the similarity rail links out from this title's own
+            cluster, the genre rail reaches titles with no other connection. */}
+        {seasons.length > 0 && (
+          <section className="mt-12" aria-labelledby="seasons-heading">
+            <h2 id="seasons-heading" className="mb-4 text-2xl font-bold tracking-tight">
+              {title} Seasons
+            </h2>
+            <nav aria-label={`Seasons of ${title}`} className="flex flex-wrap gap-2">
+              {seasons.map((season) => (
+                <Link
+                  key={season.id}
+                  href={tvSeasonPath(show.id, season.season_number)}
+                  className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary hover:bg-accent"
+                >
+                  Season {season.season_number}
+                  {season.episode_count ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      ({season.episode_count} eps)
+                    </span>
+                  ) : null}
+                </Link>
+              ))}
+            </nav>
+            <AdSlot className="mt-6" />
+          </section>
+        )}
+
+        <RecommendedTv show={show} />
+        {show.genres?.[0] && (
+          <TrendingInGenreTv genre={show.genres[0]} excludeId={show.id} />
+        )}
+        {/* Fallback trending rail for additional crawl breadth. */}
+        {trendingTv.length > 0 && (
+          <TvCarousel title="Trending Series" items={trendingTv} />
+        )}
       </main>
 
-      <JsonLd data={jsonLd} />
+      <DetailJsonLd nodes={jsonLdNodes} />
     </div>
   );
 }

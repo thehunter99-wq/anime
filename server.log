@@ -1,0 +1,30 @@
+
+> nextn@0.1.0 start
+> next start
+
+   ▲ Next.js 15.5.26
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.29.222:3000
+
+ ✓ Starting...
+ ✓ Ready in 1027ms
+[TMDB] NEXT_PUBLIC_TMDB_API_KEY is missing. Add it to .env.local (restart dev server) to enable movie/TV data.
+ ⨯ Error: TMDB unavailable resolving /tv/1399/season-1
+    at B (C:\Users\HP\AniMovie\.next\server\app\tv\[id]\season-[season]\page.js:1:889)
+    at async F (C:\Users\HP\AniMovie\.next\server\app\tv\[id]\season-[season]\page.js:1:2388) {
+  digest: '2672799954'
+}
+ ⨯ [Error: An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details. A digest property is included on this error instance which may provide additional details about the nature of the error.] {
+  digest: '2025739219'
+}
+ ⨯ Error: TMDB unavailable resolving /watch/tv/1399 S1E1
+    at w (C:\Users\HP\AniMovie\.next\server\app\watch\tv\[id]\season-[season]\episode-[episode]\[slug]\page.js:2:9395)
+    at async z (C:\Users\HP\AniMovie\.next\server\app\watch\tv\[id]\season-[season]\episode-[episode]\[slug]\page.js:2:10179) {
+  digest: '3567186619'
+}
+ ⨯ Error: TMDB unavailable resolving /download/tv/1399 S1E1
+    at x (C:\Users\HP\AniMovie\.next\server\app\download\tv\[id]\season-[season]\episode-[episode]\[slug]\page.js:1:6993)
+    at async A (C:\Users\HP\AniMovie\.next\server\app\download\tv\[id]\season-[season]\episode-[episode]\[slug]\page.js:1:7783) {
+  digest: '3219886553'
+}
+[AniList] responded with HTTP 400

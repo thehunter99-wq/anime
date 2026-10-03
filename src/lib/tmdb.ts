@@ -1,6 +1,7 @@
 
-import { type Movie, type TMDBResponse, type TVShow } from './types';
+import { type Episode, type Movie, type Season, type TMDBResponse, type TVShow } from './types';
 import { fetchWithRetry, getTMDBKey } from './health';
+import { DATA_REVALIDATE_SECONDS } from './cache-constants';
 
 const TMDB_API_URL = 'https://api.themoviedb.org/3';
 const TMDB_API_KEY = getTMDBKey();
@@ -17,7 +18,17 @@ function warnMissingKey() {
   );
 }
 
-export function getTMDBImageUrl(path: string | null, size: 'w500' | 'original' = 'w500') {
+/**
+ * TMDB image renditions this site links to.
+ *
+ * `w780` is not decoration: it is the only size TMDB offers in a 16:9 ratio,
+ * so it is what episode stills and OpenGraph video thumbnails must use. The
+ * poster sizes are 2:3 and would be letterboxed by every social preview if they
+ * were substituted for a still frame.
+ */
+export type TMDBImageSize = 'w300' | 'w342' | 'w500' | 'w780' | 'original';
+
+export function getTMDBImageUrl(path: string | null | undefined, size: TMDBImageSize = 'w500') {
   if (!path) return null;
   return `${TMDB_IMAGE_BASE_URL}${size}${path}`;
 }
@@ -46,14 +57,55 @@ let consecutiveTransportFailures = 0;
 let breakerTripped = false;
 let hasWarnedBreaker = false;
 
+/**
+ * Whether TMDB is currently failing to *answer* rather than genuinely reporting
+ * "no such title".
+ *
+ * ── Why this flag exists ─────────────────────────────────────────────────────
+ * `tmdbFetch` deliberately fails soft and returns `{ results: [] }` for every
+ * error so that a rail never breaks a page. But `fetchMovieById` then maps that
+ * to `null`, and a detail page maps `null` to `notFound()` — which means a TMDB
+ * outage is indistinguishable from a real 404.
+ *
+ * Under ISR that is not a cosmetic problem: `notFound()` output **is cached**,
+ * so a 30-second TMDB blip during a revalidation window would serve HTTP 404
+ * for a genuinely existing movie for up to `revalidate` seconds. Googlebot would
+ * record real pages as gone, which is precisely how a catalog gets deindexed.
+ *
+ * So every failure path records *why* it failed here. Detail pages call
+ * `isTMDBUnavailable()` and refuse to 404 when this is true, letting them fail
+ * loudly (a 5xx, which Next does not cache) instead of caching a false 404.
+ *
+ * 4xx is treated as a genuine answer: TMDB replying "404" is a real, fast,
+ * authoritative "this id does not exist", which is exactly what should 404.
+ */
+let upstreamUnavailable = false;
+
+/**
+ * True when TMDB could not be reached or is misconfigured, i.e. an empty result
+ * is *not* evidence that the requested title does not exist.
+ *
+ * Per-process state, not per-request: on a serverless deploy each cold start
+ * re-evaluates it, and on a long-lived server a successful call resets it.
+ */
+export function isTMDBUnavailable(): boolean {
+  return upstreamUnavailable;
+}
+
 async function tmdbFetch(endpoint: string, params: Record<string, string> = {}) {
     if (!TMDB_API_KEY) {
         warnMissingKey();
+        // No key means every id would look "missing". Treat it as an outage so
+        // detail pages never conclude the title does not exist.
+        upstreamUnavailable = true;
         return { results: [] };
     }
 
     // Host already proven unreachable on this process; skip straight to fallback.
-    if (breakerTripped) return { results: [] };
+    if (breakerTripped) {
+        upstreamUnavailable = true;
+        return { results: [] };
+    }
 
     const url = new URL(`${TMDB_API_URL}${endpoint}`);
     url.searchParams.append('api_key', TMDB_API_KEY);
@@ -62,19 +114,33 @@ async function tmdbFetch(endpoint: string, params: Record<string, string> = {}) 
     try {
         const response = await fetchWithRetry(
             url.toString(),
-            {},
+            /**
+             * Explicit cache opt-in. Without `next.revalidate` this fetch is
+             * uncached in Next 15, which makes every detail route permanently
+             * dynamic and silently disables the ISR `revalidate` those routes
+             * export — one upstream request per page view.
+             *
+             * Failed requests still throw (see `fetchWithRetry`), so an outage
+             * is never written into the cache; only successful payloads are.
+             */
+            { next: { revalidate: DATA_REVALIDATE_SECONDS } },
             TMDB_ATTEMPTS,
             TMDB_BACKOFF_MS,
             TMDB_TIMEOUT_MS
         );
         if (!response.ok) {
             console.warn(`[TMDB] ${endpoint} failed with HTTP ${response.status}`);
+            // 4xx = TMDB answered and this resource does not exist. 5xx and 429
+            // = TMDB is broken or rate-limiting us; the id may well be real.
+            upstreamUnavailable = response.status >= 500 || response.status === 429;
             return { results: [] };
         }
         consecutiveTransportFailures = 0;
+        upstreamUnavailable = false;
         return await response.json();
     } catch {
         consecutiveTransportFailures += 1;
+        upstreamUnavailable = true;
         if (consecutiveTransportFailures >= TMDB_BREAKER_THRESHOLD && !breakerTripped) {
             breakerTripped = true;
             if (!hasWarnedBreaker) {
@@ -197,6 +263,28 @@ export async function fetchTVShowById(id: number): Promise<TVShow | null> {
     return null;
 }
 
+/**
+ * Fetch a specific season with its episodes
+ */
+export async function fetchSeasonById(tvId: number, seasonNumber: number): Promise<Season & { episodes: Episode[] } | null> {
+    const data = await tmdbFetch(`/tv/${tvId}/season/${seasonNumber}`, {});
+    if (data && !Array.isArray(data) && data.id) {
+        return data as Season & { episodes: Episode[] };
+    }
+    return null;
+}
+
+/**
+ * Fetch a specific episode
+ */
+export async function fetchEpisodeById(tvId: number, seasonNumber: number, episodeNumber: number): Promise<Episode | null> {
+    const data = await tmdbFetch(`/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}`, {});
+    if (data && !Array.isArray(data) && data.id) {
+        return data as Episode;
+    }
+    return null;
+}
+
 /* ─────────────────────── Discovery lists (sitemap) ─────────────────────── */
 
 /**
@@ -227,6 +315,98 @@ export async function fetchPopularTv(page = 1): Promise<TVShow[]> {
 
 export async function fetchTrendingTv(page = 1): Promise<TVShow[]> {
   return (await fetchFromTMDB('/trending/tv/week', { page: page.toString() })) as TVShow[];
+}
+
+/**
+ * Discovery queries behind the genre and year landing pages.
+ *
+ * ── Sorting ──────────────────────────────────────────────────────────────────
+ * `popularity.desc`, not `vote_average.desc`. TMDB's top-rated lists are dominated
+ * by obscure entries with a handful of votes, so a landing page built from them
+ * looks broken to a visitor and gets no engagement signals. Popularity is what
+ * the underlying query ("best action movies to watch free") is actually asking for.
+ *
+ * ── Which year filter per media type ─────────────────────────────────────────
+ * Films expose `primary_release_year`; series do not have a "release year" at
+ * all and use `first_air_date_year`. Passing the movie filter to `/discover/tv`
+ * returns an error, not an empty list, so the two cannot be shared.
+ */
+const DISCOVER_BASE = {
+  include_adult: 'false',
+  sort_by: 'popularity.desc',
+};
+
+export async function fetchMoviesByGenre(
+  genreIds: number[],
+  page = 1
+): Promise<Movie[]> {
+  if (!genreIds.length) return [];
+  return (await fetchFromTMDB('/discover/movie', {
+    ...DISCOVER_BASE,
+    with_genres: genreIds.join('|'),
+    page: page.toString(),
+  })) as Movie[];
+}
+
+export async function fetchTvByGenre(genreIds: number[], page = 1): Promise<TVShow[]> {
+  if (!genreIds.length) return [];
+  return (await fetchFromTMDB('/discover/tv', {
+    ...DISCOVER_BASE,
+    with_genres: genreIds.join('|'),
+    page: page.toString(),
+  })) as TVShow[];
+}
+
+export async function fetchMoviesByYear(year: number, page = 1): Promise<Movie[]> {
+  return (await fetchFromTMDB('/discover/movie', {
+    ...DISCOVER_BASE,
+    primary_release_year: String(year),
+    page: page.toString(),
+  })) as Movie[];
+}
+
+export async function fetchTvByYear(year: number, page = 1): Promise<TVShow[]> {
+  return (await fetchFromTMDB('/discover/tv', {
+    ...DISCOVER_BASE,
+    first_air_date_year: String(year),
+    page: page.toString(),
+  })) as TVShow[];
+}
+
+/**
+ * Dubbed discovery — the rail behind `/dub` and `/dub/[lang]`.
+ *
+ * ── Why `with_original_language` and not TMDB's `with_dub` ────────────────────
+ * TMDB has no "has a dub" filter. The `with_original_language` parameter is not
+ * exactly the same claim, but for the queries this page targets ("hindi dubbed
+ * movies", "tamil dubbed movies download") it is the honest approximation: a
+ * Hindi-original film on an English-facing site *is* the dubbed copy for that
+ * audience, and it is the only signal that is both available and stable rather
+ * than guessed per title.
+ *
+ * ── Why TMDB only, no AniList ─────────────────────────────────────────────────
+ * AniList exposes no language or dub field at all, so an anime half here would
+ * have to be invented. The page says "movies and series" and does not pad itself
+ * with anime it cannot actually classify — a thin page with unrelated titles is
+ * the shape Google penalises.
+ *
+ * `popularity.desc` for the same reason as the genre/year rails: sorted by what
+ * people are actually watching, not by obscure high-average entries.
+ */
+export async function fetchMoviesByLanguage(language: string, page = 1): Promise<Movie[]> {
+  return (await fetchFromTMDB('/discover/movie', {
+    ...DISCOVER_BASE,
+    with_original_language: language,
+    page: page.toString(),
+  })) as Movie[];
+}
+
+export async function fetchTvByLanguage(language: string, page = 1): Promise<TVShow[]> {
+  return (await fetchFromTMDB('/discover/tv', {
+    ...DISCOVER_BASE,
+    with_original_language: language,
+    page: page.toString(),
+  })) as TVShow[];
 }
 
 /**

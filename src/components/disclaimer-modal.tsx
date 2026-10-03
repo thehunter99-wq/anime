@@ -11,7 +11,7 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { AniMovieLogo } from './icons';
+import { SiteBrand } from './site-brand';
 import { SITE_NAME } from '@/lib/site';
 import { ScrollArea } from './ui/scroll-area';
 
@@ -34,7 +34,7 @@ export default function DisclaimerModal() {
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogContent className="p-0 w-[90vw] max-w-md rounded-lg">
         <div className="flex flex-col items-center justify-center p-6 text-center">
-            <AniMovieLogo className="h-14 w-14 text-primary mb-4" />
+            <SiteBrand className="mb-4" />
             <AlertDialogHeader>
                 <AlertDialogTitle className="text-2xl font-bold">{SITE_NAME} Disclaimer</AlertDialogTitle>
                 <AlertDialogDescription className="sr-only">

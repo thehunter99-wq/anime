@@ -10,7 +10,7 @@ import { type Media } from '@/lib/types';
 
 interface MediaCarouselProps {
   title: string;
-  items: Media[];
+  items: (Media & { seoAnchors?: string[] })[];
 }
 
 export default function MediaCarousel({ title, items }: MediaCarouselProps) {
@@ -33,7 +33,7 @@ export default function MediaCarousel({ title, items }: MediaCarouselProps) {
                 key={item.id + '-' + index}
                 className="basis-1/2 pl-2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
               >
-                <MediaCard item={item} />
+                <MediaCard item={item} index={index} />
               </CarouselItem>
             ))}
           </CarouselContent>

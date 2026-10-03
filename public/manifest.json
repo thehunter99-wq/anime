@@ -1,0 +1,50 @@
+{
+  "name": "MovAnime - Watch Anime, Movies & TV Shows Free",
+  "short_name": "MovAnime",
+  "description": "Your one-stop platform for streaming the latest anime, reading popular manga, and watching movies. All for free, with sub and dub options available.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#010816",
+  "theme_color": "#49C6E5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["entertainment", "video"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Trending Anime",
+      "short_name": "Trending",
+      "description": "Watch trending anime",
+      "url": "/?tab=anime",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Movies",
+      "short_name": "Movies",
+      "description": "Browse movies",
+      "url": "/?tab=movies",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "TV Shows",
+      "short_name": "TV Shows",
+      "description": "Browse TV series",
+      "url": "/?tab=tv",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

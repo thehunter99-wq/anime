@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Zap, ArrowRight } from 'lucide-react';
 
 import { DIRECT_LINK_URL } from '@/config/ads';
 import {
@@ -11,33 +11,11 @@ import {
 import { cn } from '@/lib/utils';
 
 export interface PlayerOverlayProps {
-  /**
-   * Changing this re-arms the overlay. Pass the episode, season, server index
-   * and media id so every navigation the user makes produces a fresh,
-   * unmissed opportunity — but still subject to the frequency cap.
-   */
   rearmKey: string;
   className?: string;
-  /** Disables the overlay for content types that must never be interrupted. */
   disabled?: boolean;
 }
 
-/**
- * Transparent Direct Link overlay sitting on top of the video iframe.
- *
- * The entire surface is the click target: the visitor's first natural click to
- * start watching opens the monetised Direct Link in a new tab and removes the
- * overlay, handing the player back immediately. Re-armed on every episode,
- * season, server and route change.
- *
- * The overlay IS the link. Using a real anchor instead of `window.open` means
- * the browser performs the navigation itself, so mobile Safari, popup blockers
- * and middle-click all behave natively — no synthetic click is dispatched, which
- * is also what ad networks look for when flagging forced navigation.
- *
- * Once it unmounts it is gone from the DOM entirely, so every subsequent touch
- * and click reaches the underlying iframe unmodified.
- */
 export default function PlayerOverlay({
   rearmKey,
   className,
@@ -45,12 +23,8 @@ export default function PlayerOverlay({
 }: PlayerOverlayProps) {
   const [armed, setArmed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
 
-  /**
-   * The cap is read on mount only. SSR cannot see localStorage, so the overlay
-   * is rendered after hydration rather than during it — rendering it in SSR and
-   * removing it on the client would be a real hydration mismatch.
-   */
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -63,13 +37,22 @@ export default function PlayerOverlay({
     setArmed(!isDirectLinkCapped());
   }, [rearmKey, disabled]);
 
+  useEffect(() => {
+    if (armed) {
+      const timer = setTimeout(() => setVisible(true), 800);
+      return () => clearTimeout(timer);
+    } else {
+      setVisible(false);
+    }
+  }, [armed]);
+
   const handleActivate = useCallback(() => {
     const mayShowAgain = recordDirectLinkTrigger();
-    // Unmount either way: after the budget is spent the overlay stays gone.
     setArmed(mayShowAgain);
+    setVisible(false);
   }, []);
 
-  if (!mounted || disabled || !DIRECT_LINK_URL || !armed) return null;
+  if (!mounted || disabled || !DIRECT_LINK_URL || !armed || !visible) return null;
 
   return (
     <div className={cn('absolute inset-0 z-20', className)}>
@@ -82,19 +65,24 @@ export default function PlayerOverlay({
         aria-label="Open the stream provider in a new tab"
         className={cn(
           'group absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-4',
-          // Touch-action keeps the tap from being treated as a scroll gesture on
-          // mobile, so the first tap reaches the link instead of the page.
           'touch-manipulation select-none'
         )}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform duration-200 group-hover:scale-105 group-active:scale-95 sm:h-20 sm:w-20">
-          <Play className="ml-1 h-7 w-7 fill-current sm:h-9 sm:w-9" />
-        </span>
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-sky-500/20 to-indigo-600/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-300" />
+          <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-black/70 via-slate-900/80 to-black/70 text-white backdrop-blur-md border border-white/10 shadow-2xl shadow-black/50 transition-transform duration-200 group-hover:scale-105 group-active:scale-95 sm:h-20 sm:w-20">
+            <Play className="ml-1 h-7 w-7 fill-current sm:h-9 sm:w-9" />
+          </span>
+        </div>
 
-        <span className="rounded-md bg-black/60 px-3 py-1.5 text-center text-xs font-medium text-white backdrop-blur-sm sm:text-sm">
-          Continue to the stream provider
-        </span>
+        <div className="flex flex-col items-center gap-2">
+          <span className="flex items-center gap-2 rounded-full bg-gradient-to-r from-black/60 via-slate-900/70 to-black/60 px-5 py-2.5 text-center text-xs font-semibold text-white backdrop-blur-md border border-white/10 shadow-lg sm:text-sm">
+            <Zap className="h-3.5 w-3.5 text-yellow-400" />
+            Continue to the stream provider
+            <ArrowRight className="h-3.5 w-3.5 text-sky-400" />
+          </span>
+        </div>
       </a>
     </div>
   );

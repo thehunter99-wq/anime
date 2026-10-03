@@ -87,7 +87,6 @@ function RelatedMediaCard({ item }: { item: Media & { relationType: string } }) 
               fill
               className="rounded-t-lg object-cover"
               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
-              unoptimized
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <Badge variant="secondary" className="absolute left-2 top-2">{item.relationType}</Badge>

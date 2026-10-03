@@ -77,7 +77,6 @@ function HeroSlide({ item }: HeroSlideProps) {
           className="object-cover"
           priority
           data-ai-hint="tv show background"
-          unoptimized
         />
       )}
       <div className="absolute inset-0 z-10 bg-gradient-to-t from-background via-background/80 to-transparent" />
@@ -90,10 +89,10 @@ function HeroSlide({ item }: HeroSlideProps) {
               <Image
                 src={posterUrl}
                 alt={`Poster for ${title}`}
-                width={220}
-                height={330}
-                className="rounded-lg"
-                unoptimized
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 160px, (max-width: 1024px) 180px, 220px"
+                loading="lazy"
               />
             )}
           </div>

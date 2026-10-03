@@ -276,16 +276,19 @@ export default function Viewer({
         <div className="flex items-center gap-4 overflow-hidden">
           <Link href={backLink} passHref>
             <Button 
-              variant={isManga ? 'outline' : 'outline'} 
+              variant="outline" 
               size="icon" 
               aria-label="Go back to details"
-              className={isManga ? 'bg-white dark:bg-stone-800' : ''}
+              className={cn(
+                'rounded-xl border-slate-200 bg-white/80 backdrop-blur hover:bg-slate-50 hover:border-sky-300 shadow-sm transition-all',
+                isManga ? 'bg-white dark:bg-stone-800' : ''
+              )}
             >
               <ArrowLeft />
             </Button>
           </Link>
           <div className="flex flex-col overflow-hidden">
-            <h1 className="truncate text-lg font-semibold">{title}</h1>
+            <h1 className="truncate text-lg font-bold text-slate-800">{title}</h1>
             {!isMovie && (
               <span className="text-sm text-muted-foreground">
                 {isTv && `Season ${seasonNumber} • `}{itemLabel} {itemNumber}
@@ -296,7 +299,7 @@ export default function Viewer({
         <div className='flex items-center gap-2'>
         {(isTv && media.seasons && media.seasons.length > 1) && (
             <Select onValueChange={(value) => handleSeasonChange(parseInt(value))} defaultValue={seasonNumber.toString()}>
-              <SelectTrigger className={cn("w-[150px]", isManga ? 'bg-white dark:bg-stone-800' : '')}>
+              <SelectTrigger className={cn("w-[150px] rounded-xl border-slate-200 bg-white/80 backdrop-blur", isManga ? 'bg-white dark:bg-stone-800' : '')}>
                 <SelectValue placeholder="Select a season" />
               </SelectTrigger>
               <SelectContent>
@@ -345,7 +348,7 @@ export default function Viewer({
               Every server failed to load this title. It may not be catalogued yet —
               try the download options below.
             </p>
-            <Button onClick={() => { setSourceIndex(0); setLoadFailed(false); setIsLoading(true); }} variant="secondary">
+            <Button onClick={() => { setSourceIndex(0); setLoadFailed(false); setIsLoading(true); }} variant="secondary" className="rounded-xl">
               Retry Server 1
             </Button>
           </div>
@@ -434,7 +437,7 @@ export default function Viewer({
         <div className="container mx-auto flex flex-col items-center gap-2 px-4 pb-2">
           {!isManga && (
             <div className="flex w-full flex-col items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">Audio / Language</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Audio / Language</span>
               <div className="flex w-full flex-wrap items-center justify-center gap-2">
                 {LANGUAGE_OPTIONS.map((option) => (
                   <Button
@@ -446,7 +449,12 @@ export default function Viewer({
                       setAudioLang(option.lang);
                       if (option.dub !== undefined) setIsDub(option.dub);
                     }}
-                    className="h-auto min-w-0 flex-col gap-0 px-3 py-1.5"
+                    className={cn(
+                      'h-auto min-w-0 flex-col gap-0 px-3 py-1.5 rounded-xl transition-all duration-200',
+                      audioLang === option.lang
+                        ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white border-transparent shadow-sm shadow-sky-500/30'
+                        : 'bg-white/80 text-slate-600 border-slate-200 hover:border-sky-300 hover:bg-sky-50'
+                    )}
                   >
                     <span className="text-xs font-semibold">{option.label}</span>
                     <span className="text-[10px] font-normal opacity-80">
@@ -464,7 +472,7 @@ export default function Viewer({
             </p>
           )}
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="text-xs text-muted-foreground">Server</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Server</span>
             {sources.map((source, index) => (
               <Button
                 key={source.id}
@@ -476,6 +484,12 @@ export default function Viewer({
                   setIsLoading(true);
                   setLoadFailed(false);
                 }}
+                className={cn(
+                  'rounded-xl transition-all duration-200',
+                  index === sourceIndex
+                    ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white border-transparent shadow-sm shadow-sky-500/30'
+                    : 'bg-white/80 text-slate-600 border-slate-200 hover:border-sky-300 hover:bg-sky-50'
+                )}
               >
                 {source.label}
                 <span className="ml-1.5 text-[10px] uppercase opacity-80">
@@ -492,8 +506,11 @@ export default function Viewer({
           <Button
             onClick={() => handleNavigation(itemNumber - 1)}
             disabled={itemNumber <= 1}
-            variant="secondary"
-             className={isManga ? 'bg-white dark:bg-stone-800' : ''}
+            variant="outline"
+            className={cn(
+              'rounded-xl border-slate-200 bg-white/80 backdrop-blur hover:bg-slate-50 hover:border-sky-300 shadow-sm transition-all',
+              isManga ? 'bg-white dark:bg-stone-800' : ''
+            )}
           >
             <ChevronLeft className="mr-2" />
             Previous
@@ -501,8 +518,11 @@ export default function Viewer({
           <Button
             onClick={() => handleNavigation(itemNumber + 1)}
             disabled={!!(totalItems && itemNumber >= totalItems)}
-            variant="secondary"
-             className={isManga ? 'bg-white dark:bg-stone-800' : ''}
+            variant="outline"
+            className={cn(
+              'rounded-xl border-slate-200 bg-white/80 backdrop-blur hover:bg-slate-50 hover:border-sky-300 shadow-sm transition-all',
+              isManga ? 'bg-white dark:bg-stone-800' : ''
+            )}
           >
             Next
             <ChevronRight className="ml-2" />

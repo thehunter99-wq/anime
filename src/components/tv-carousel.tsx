@@ -8,10 +8,11 @@ import {
 } from '@/components/ui/carousel';
 import TvCard from './tv-card';
 import { type TVShow } from '@/lib/types';
+import { getTvSeoAnchorByIndex } from '@/components/tv-seo-anchors';
 
 interface TvCarouselProps {
   title: string;
-  items: TVShow[];
+  items: (TVShow & { seoAnchors?: string[] })[];
 }
 
 export default function TvCarousel({ title, items }: TvCarouselProps) {
@@ -34,7 +35,11 @@ export default function TvCarousel({ title, items }: TvCarouselProps) {
                 key={item.id + '-' + index}
                 className="basis-1/2 pl-2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
               >
-                <TvCard item={item} />
+                <TvCard
+                  item={item}
+                  seoAnchor={item.seoAnchors?.[0] ?? getTvSeoAnchorByIndex(item.name, index, item.first_air_date)}
+                  useSeoAnchor={true}
+                />
               </CarouselItem>
             ))}
           </CarouselContent>

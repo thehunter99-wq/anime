@@ -7,10 +7,11 @@ import {
 } from '@/components/ui/carousel';
 import MovieCard from './movie-card';
 import { type Movie } from '@/lib/types';
+import { getSeoAnchorByIndex } from '@/components/recommended-movies-enhanced';
 
 interface MovieCarouselProps {
   title: string;
-  items: Movie[];
+  items: (Movie & { seoAnchors?: string[] })[];
 }
 
 export default function MovieCarousel({ title, items }: MovieCarouselProps) {
@@ -33,7 +34,11 @@ export default function MovieCarousel({ title, items }: MovieCarouselProps) {
                 key={item.id + '-' + index}
                 className="basis-1/2 pl-2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
               >
-                <MovieCard item={item} />
+                <MovieCard
+                  item={item}
+                  seoAnchor={item.seoAnchors?.[0] ?? getSeoAnchorByIndex(item.title, index, item.release_date)}
+                  useSeoAnchor={true}
+                />
               </CarouselItem>
             ))}
           </CarouselContent>

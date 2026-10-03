@@ -2,19 +2,28 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 
-import { fetchMovieById, getTMDBImageUrl } from '@/lib/tmdb';
+import { fetchMovieById, getTMDBImageUrl, isTMDBUnavailable } from '@/lib/tmdb';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { moviePath, watchPath, absoluteUrl } from '@/lib/routes';
-import { buildDetailMetadata, buildMediaJsonLd } from '@/lib/seo';
-import JsonLd from '@/components/json-ld-script';
+import {
+  buildDetailMetadata,
+  buildMediaJsonLd,
+  buildVideoObject,
+  buildBreadcrumbList,
+  buildFAQSchema,
+} from '@/lib/seo';
+import DetailJsonLd from '@/components/detail-json-ld';
+import { RatingBadge } from '@/components/rating-badge';
 import Header from '@/components/header';
-import RecommendedMovies from '@/components/recommended-movies';
+import RecommendedMovies from '@/components/recommended-movies-enhanced';
+import TrendingInGenre from '@/components/trending-in-genre';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
 import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 import { getDownloadUrl } from '@/lib/embed';
+import { pingIndexNowForContent } from '@/lib/indexnow';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -31,6 +40,38 @@ type Props = {
  */
 export const revalidate = 3600;
 
+/**
+ * `true` is the default, but it is stated explicitly because this route is
+ * deliberately additive to what the build knows about.
+ *
+ * A film only becomes reachable here if a rail, a search result, or the sitemap
+ * happened to link it. Without this flag a `generateStaticParams`-less route is
+ * still fine, but stating the intent guards against anyone later adding a
+ * restrictive `generateStaticParams` and unknowingly 404-ing the long tail.
+ */
+export const dynamicParams = true;
+
+/**
+ * Guards against caching a false 404 while TMDB is down.
+ *
+ * `fetchMovieById` returns `null` both for "no such movie" and for "TMDB did not
+ * answer". Under ISR those must diverge: `notFound()` is cached, so a transient
+ * outage would otherwise mark real movies as gone for up to an hour — the exact
+ * way a catalog gets deindexed. A thrown error surfaces as a 5xx, which Next
+ * does not persist, so the next request re-attempts the fetch.
+ */
+async function resolveMovie(id: number) {
+  if (!Number.isFinite(id)) notFound();
+
+  const movie = await fetchMovieById(id);
+  if (movie) return movie;
+
+  if (isTMDBUnavailable()) {
+    throw new Error(`TMDB unavailable while resolving movie ${id}`);
+  }
+  notFound();
+}
+
 const toId = (raw: string): number => Number.parseInt(raw, 10);
 const yearOf = (date: string | null | undefined): number | null =>
   date ? Number.parseInt(date.slice(0, 4), 10) || null : null;
@@ -40,8 +81,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const id = toId(raw);
   if (!Number.isFinite(id)) return { title: 'Not Found' };
 
-  const movie = await fetchMovieById(id);
-  if (!movie) return { title: 'Not Found' };
+  const movie = await resolveMovie(id);
+
+  // Trigger IndexNow ping for fast indexing during ISR revalidation (fire-and-forget)
+  pingIndexNowForContent('movie', movie.id).catch(console.error);
 
   // Backdrop first: it is 16:9 and fills the hero, so it produces a much better
   // OG card than the portrait poster.
@@ -61,10 +104,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function MoviePage({ params }: Props) {
   const { id: raw } = await params;
   const id = toId(raw);
-  if (!Number.isFinite(id)) notFound();
 
-  const movie = await fetchMovieById(id);
-  if (!movie) notFound();
+  const movie = await resolveMovie(id);
+
+  // Trigger IndexNow ping for fast indexing (fire-and-forget)
+  pingIndexNowForContent('movie', movie.id).catch(console.error);
 
   const title = movie.title;
   const year = yearOf(movie.release_date);
@@ -72,18 +116,45 @@ export default async function MoviePage({ params }: Props) {
   const poster = getTMDBImageUrl(movie.poster_path, 'w500');
   const watchHref = watchPath('movie', movie.id);
 
-  const jsonLd = buildMediaJsonLd({
-    type: 'Movie',
-    title,
-    description: movie.overview,
-    image: image ?? undefined,
-    url: absoluteUrl(moviePath(movie.id), SITE_URL),
-    datePublished: movie.release_date || null,
-    genres: movie.genres?.map((g) => g.name),
-    // Omitted on purpose: TMDB votes are not displayed on this page, and an
-    // aggregateRating without visible ratings is a structured-data violation.
-    rating: null,
-  });
+  const jsonLdNodes = [
+    buildMediaJsonLd({
+      type: 'Movie',
+      title,
+      description: movie.overview,
+      image: image ?? undefined,
+      url: absoluteUrl(moviePath(movie.id), SITE_URL),
+      datePublished: movie.release_date || null,
+      genres: movie.genres?.map((g) => g.name),
+      // Safe to emit now because `<RatingBadge>` renders these exact numbers
+      // directly below. Emitting a rating the page does not display is a
+      // structured-data policy violation, so the two are always wired together.
+      rating: {
+        voteAverage: movie.vote_average,
+        voteCount: movie.vote_count ?? null,
+      },
+    }),
+    buildVideoObject({
+      name: `Watch ${title}${year ? ` (${year})` : ''} full movie online`,
+      description: movie.overview,
+      thumbnailUrl: poster ?? image,
+      uploadDate: movie.release_date || null,
+      embedUrl: absoluteUrl(watchPath('movie', movie.id), SITE_URL),
+    }),
+    buildBreadcrumbList({
+      siteUrl: SITE_URL,
+      // No `/movies` index exists; movies live in a home-page tab, which is the
+      // same URL the header navigation links to.
+      sectionName: 'Movies',
+      sectionUrl: `${SITE_URL}/?tab=movies`,
+      title,
+    }),
+    buildFAQSchema({
+      title,
+      year,
+      isSeries: false,
+      isAnime: false,
+    }),
+  ];
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -116,6 +187,7 @@ export default async function MoviePage({ params }: Props) {
                 fill
                 sizes="(max-width: 640px) 160px, 208px"
                 className="object-cover"
+                loading="lazy"
               />
             </div>
           )}
@@ -130,6 +202,13 @@ export default async function MoviePage({ params }: Props) {
                 <span>
                   {SITE_NAME} &middot; Free streaming
                 </span>
+                {/* Required for the `aggregateRating` in the page JSON-LD: the
+                    visible number must be the same number the markup declares. */}
+                <RatingBadge
+                  average={movie.vote_average}
+                  votes={movie.vote_count}
+                  label="TMDB"
+                />
               </div>
             </div>
 
@@ -169,10 +248,15 @@ export default async function MoviePage({ params }: Props) {
           </div>
         </div>
 
+                {/* Crawl paths: the similarity rail links out from this title's own
+            cluster, the genre rail reaches titles with no other connection. */}
         <RecommendedMovies movie={movie} />
+        {movie.genres?.[0] && (
+          <TrendingInGenre genre={movie.genres[0]} excludeId={movie.id} />
+        )}
       </main>
 
-      <JsonLd data={jsonLd} />
+      <DetailJsonLd nodes={jsonLdNodes} />
     </div>
   );
 }

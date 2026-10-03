@@ -16,6 +16,12 @@ export type Media = {
   bannerImage: string | null;
   episodes: number | null;
   chapters: number | null;
+  /**
+   * AniList community average on a **0-100** scale, or null when untitled by
+   * enough voters. Callers must divide by 10 to match the TMDB 0-10 scale used
+   * everywhere else on the site.
+   */
+  averageScore: number | null;
   description: string;
   startDate: {
     year: number;
@@ -78,6 +84,20 @@ export type Season = {
   overview: string;
   poster_path: string;
   season_number: number;
+}
+
+export type Episode = {
+  id: number;
+  name: string;
+  overview: string;
+  still_path: string | null;
+  air_date: string;
+  episode_number: number;
+  season_number: number;
+  vote_average: number;
+  vote_count: number;
+  runtime: number | null;
+  show_id: number;
 }
 
 export type TVShow = {

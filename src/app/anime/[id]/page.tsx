@@ -1,24 +1,55 @@
-import { notFound } from 'next/navigation';
+﻿import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 
-import { fetchMediaById } from '@/lib/anilist';
+import { fetchFromAniList, fetchMediaById, isAniListUnavailable } from '@/lib/anilist';
 import { resolveAnimeIds } from '@/lib/anime-mapping';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { animePath, watchPath, absoluteUrl } from '@/lib/routes';
-import { buildDetailMetadata, buildMediaJsonLd } from '@/lib/seo';
-import JsonLd from '@/components/json-ld-script';
+import {
+  buildDetailMetadata,
+  buildMediaJsonLd,
+  buildVideoObject,
+  buildBreadcrumbList,
+  buildFAQSchema,
+} from '@/lib/seo';
+import DetailJsonLd from '@/components/detail-json-ld';
+import { RatingBadge } from '@/components/rating-badge';
 import Header from '@/components/header';
+import MediaCarousel from '@/components/media-carousel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
 import { AdSlot } from '@/components/ads';
+import { pingIndexNowForContent } from '@/lib/indexnow';
+import { getEnhancedTrendingByGenre } from '@/components/anime-seo-anchors';
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
 export const revalidate = 3600;
+
+/** Additive generation: any id a rail or the sitemap links resolves on demand. */
+export const dynamicParams = true;
+
+/**
+ * `fetchMediaById` returns `null` both for "no such anime" and for "AniList did
+ * not answer". Only the first may become `notFound()`, because ISR caches that
+ * response â€” an outage must never mark real pages as missing. Throwing produces
+ * a 5xx, which Next does not cache, so the next request retries.
+ */
+async function resolveMedia(id: number) {
+  if (!Number.isFinite(id)) notFound();
+
+  const media = await fetchMediaById(id);
+  if (media) return media;
+
+  if (isAniListUnavailable()) {
+    throw new Error(`AniList unavailable while resolving media ${id}`);
+  }
+  notFound();
+}
 
 const toId = (raw: string): number => Number.parseInt(raw, 10);
 
@@ -27,11 +58,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const id = toId(raw);
   if (!Number.isFinite(id)) return { title: 'Not Found' };
 
-  const media = await fetchMediaById(id);
-  if (!media) return { title: 'Not Found' };
+  const media = await resolveMedia(id);
+
+  // Trigger IndexNow ping for fast indexing during ISR revalidation (fire-and-forget)
+  pingIndexNowForContent('anime', media.id).catch(console.error);
 
   const title = media.title.english || media.title.romaji;
-
   // Banner first: it is 16:9 and fills the hero. The portrait cover is the
   // fallback so a title without a banner still gets a valid card.
   const image = media.bannerImage ?? media.coverImage.extraLarge;
@@ -53,33 +85,91 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function AnimePage({ params }: Props) {
   const { id: raw } = await params;
   const id = toId(raw);
-  if (!Number.isFinite(id)) notFound();
 
-  const media = await fetchMediaById(id);
-  if (!media) notFound();
+  const media = await resolveMedia(id);
+
+  // Trigger IndexNow ping for fast indexing (fire-and-forget)
+  pingIndexNowForContent('anime', media.id).catch(console.error);
 
   const title = media.title.english || media.title.romaji;
   const image = media.bannerImage ?? media.coverImage.extraLarge;
   const genres = media.genres ?? [];
 
+  /**
+   * Cross-link rails, resolved during the server render so the anchors are
+   * present in the HTML for the crawler. AniList has no "recommendations"
+   * endpoint, so the genre list serves that role.
+   *
+   * This page previously had no outbound links whatsoever, which made every
+   * anime detail URL a crawl dead end â€” the biggest internal-linking gap on the
+   * site, since anime is the main source of long-tail traffic.
+   *
+   * Each source independently tolerates failure, so one outage cannot empty the
+   * whole section, and self is filtered out so a page never links to itself.
+   */
+  const [sameGenreAnime, trendingAnime] = await Promise.all([
+    media.genres?.[0]
+      ? getEnhancedTrendingByGenre(media.genres[0], 'ANIME', media.id, 20)
+      : Promise.resolve([]),
+    fetchFromAniList({
+      type: 'ANIME',
+      sort: ['TRENDING_DESC'],
+      perPage: 20,
+    }).catch(() => []),
+  ]);
+
+  const withoutSelf = <T extends { id: number }>(list: T[]): T[] =>
+    list.filter((item) => item.id !== media.id);
+
   // Resolve the TMDB id server-side so the watch button can hand the player a
   // TMDB-native id instead of an AniList id, which no embed mirror accepts.
   const mapping = await resolveAnimeIds(media.id);
 
-  const jsonLd = buildMediaJsonLd({
-    type: 'TVSeries',
-    title,
-    description: media.description,
-    image: image ?? undefined,
-    url: absoluteUrl(animePath(media.id), SITE_URL),
-    datePublished:
-      media.startDate?.year
-        ? `${media.startDate.year}-${String(media.startDate.month || 1).padStart(2, '0')}-${String(media.startDate.day || 1).padStart(2, '0')}`
-        : null,
-    genres,
-    // Ratings are omitted until the page renders visible ratings; see seo.ts.
-    rating: null,
-  });
+  const startDate = media.startDate?.year
+    ? `${media.startDate.year}-${String(media.startDate.month || 1).padStart(2, '0')}-${String(media.startDate.day || 1).padStart(2, '0')}`
+    : null;
+
+  // AniList returns `averageScore` (0-100) but no vote count. The score is
+  // displayed so visitors see it, but `aggregateRating` is deliberately NOT
+  // emitted: Google requires `ratingCount` to substantiate an aggregate rating,
+  // and inventing or omitting it would make the markup incomplete and put the
+  // site at risk of a rich-result penalty for the whole page.
+  const anilistScore =
+    media.averageScore != null && media.averageScore > 0
+      ? media.averageScore / 10
+      : null;
+
+  const jsonLdNodes = [
+    buildMediaJsonLd({
+      type: 'TVSeries',
+      title,
+      description: media.description,
+      image: image ?? undefined,
+      url: absoluteUrl(animePath(media.id), SITE_URL),
+      datePublished: startDate,
+      genres,
+      rating: null,
+    }),
+    buildVideoObject({
+      name: `Watch ${title} English Sub & Dub online free`,
+      description: media.description,
+      thumbnailUrl: media.coverImage.extraLarge,
+      uploadDate: startDate,
+      embedUrl: absoluteUrl(watchPath('anime', media.id), SITE_URL),
+    }),
+    buildBreadcrumbList({
+      siteUrl: SITE_URL,
+      sectionName: 'Anime',
+      sectionUrl: `${SITE_URL}/?tab=anime`,
+      title,
+    }),
+    buildFAQSchema({
+      title,
+      year: media.startDate?.year || null,
+      isSeries: true,
+      isAnime: true,
+    }),
+  ];
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -109,6 +199,7 @@ export default async function AnimePage({ params }: Props) {
               fill
               sizes="(max-width: 640px) 160px, 208px"
               className="object-cover"
+              loading="lazy"
             />
           </div>
 
@@ -123,6 +214,9 @@ export default async function AnimePage({ params }: Props) {
                 <span>
                   {SITE_NAME} &middot; Free streaming
                 </span>
+                {/* AniList publishes a score but no vote count, so this is
+                    display-only and is deliberately absent from the JSON-LD. */}
+                <RatingBadge average={anilistScore} label="AniList" />
               </div>
             </div>
 
@@ -158,9 +252,28 @@ export default async function AnimePage({ params }: Props) {
             <AdSlot className="mt-2" />
           </div>
         </div>
+
+        {/* Outbound crawl paths. Without these the page was a dead end. */}
+        <div className="mt-12 space-y-12">
+          {sameGenreAnime.length > 0 && (
+            <MediaCarousel
+              title={`More ${media.genres?.[0]} Anime`}
+              items={withoutSelf(sameGenreAnime)}
+            />
+          )}
+          {trendingAnime.length > 0 && (
+            <MediaCarousel
+              title="Trending Anime"
+              items={withoutSelf(trendingAnime.map((item, index) => ({
+                ...item,
+                seoAnchors: [`Watch ${item.title.english || item.title.romaji} Online Free`],
+              })))}
+            />
+          )}
+        </div>
       </main>
 
-      <JsonLd data={jsonLd} />
+      <DetailJsonLd nodes={jsonLdNodes} />
     </div>
   );
 }

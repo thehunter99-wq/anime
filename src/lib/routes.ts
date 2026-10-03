@@ -13,7 +13,7 @@
  *   /anime/[id]     AniList anime detail   (canonical)
  *   /manga/[id]     AniList manga detail   (canonical)
  *   /tv/[id]        TMDB series detail     (canonical)
- *   /watch/...      player                 (canonical, not indexed)
+ *   /view/[type]    player                 (canonical, not indexed)
  *
  * Numeric ids, not slugs: a slug forces a redirect whenever a title is
  * re-translated or romanised, and those redirects leak link equity.
@@ -32,14 +32,64 @@ export const mangaPath = (id: number | string): string => `/manga/${id}`;
 export const tvPath = (id: number | string): string => `/tv/${id}`;
 
 /**
+ * Season landing page for a TV series: `/tv/[id]/season-[n]`.
+ *
+ * ── Why this is its own route ────────────────────────────────────────────────
+ * "breaking bad season 2" and "money heist season 3 watch online" are head terms
+ * in their own right, distinct from both the series page (which sells the whole
+ * show) and the episode page (which sells one episode). Without this route the
+ * query has no page with matching title, heading and canonical, so it either
+ * lands on the series page and competes for the wrong intent, or does not rank.
+ *
+ * The segment is `season-N`, matching the episode routes, so the two families
+ * read the same way in a URL and in a server log.
+ */
+export const tvSeasonPath = (id: number | string, seasonNumber: number | string): string =>
+  `/tv/${id}/season-${seasonNumber}`;
+
+/**
+ * Dubbed / subbed landing pages: `/dub`, `/dub/[lang]` and `/sub`.
+ *
+ * `/sub` is a real page rather than a redirect to `/anime`, because "english sub
+ * anime" is a query with its own intent and a hub of subbed titles answers it
+ * without the visitor having to work out which of the listed titles are subbed.
+ */
+export const dubPath = (language?: string): string =>
+  language ? `/dub/${language}` : '/dub';
+
+export const subPath = (): string => '/sub';
+
+/**
  * Player route. Kept out of the sitemap and marked `noindex` because it is a
  * thin wrapper around a third-party embed, and indexing it competes with the
  * detail page for the same keywords.
+ *
+ * ── Corrected prefix ────────────────────────────────────────────────────────
+ * This previously returned `/watch/${kind}/${id}`, but **no `/watch` route has
+ * ever existed**. The player is served by `app/view/[type]/[id-slug]`, so every
+ * caller was building a URL that 404s — including the primary "Watch" button on
+ * all three detail pages. Verified: `/watch/anime/21` returns 404 while
+ * `/view/anime/21` returns 200.
+ *
+ * The bare-id form is used rather than `id-slug` because this helper only
+ * receives an id, and `app/view/[type]/[id-slug]` parses the id from the first
+ * `-`-separated segment, so a bare id resolves correctly (verified for movie,
+ * tv and anime). Callers that have a title available — `viewer.tsx` and
+ * `json-ld.tsx` — build the slugs themselves.
  */
 export const watchPath = (
   kind: 'movie' | 'tv' | 'anime' | 'manga',
   id: number | string
-): string => `/watch/${kind}/${id}`;
+): string => `/view/${kind}/${id}`;
+
+/**
+ * Long-tail download routes. These map to the `/download/[type]/[id]/[...slug]`
+ * pages which are indexed and serve download-focused SEO content.
+ */
+export const downloadPath = (
+  kind: 'movie' | 'tv' | 'anime' | 'manga',
+  id: number | string
+): string => `/download/${kind}/${id}`;
 
 /**
  * Legacy `/media/...` routes are superseded by the canonical paths above.

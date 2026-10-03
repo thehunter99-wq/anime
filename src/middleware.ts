@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { resolveGenreSlug } from '@/lib/genres';
+import { isValidYear } from '@/lib/years';
+import { resolveDubLanguage } from '@/lib/languages';
+import { MAX_SEASON, canonicalEpisodePath, parseEpisodePath } from '@/lib/episode-slug';
+
 /**
  * Legacy `/media/*` → canonical route consolidation.
  *
@@ -18,14 +23,16 @@ import { NextResponse, type NextRequest } from 'next/server';
  * 308 rather than 307 so the redirect is cached indefinitely by browsers and
  * crawlers; the destination is stable.
  *
- * Scope is deliberately narrow — it matches only the three prefixes that have a
- * canonical replacement. `/media/manga/*` is intentionally absent: manga has no
- * `/manga/[id]` route yet, so redirecting it would 404 real content.
+ * Scope is deliberately narrow — it matches only the prefixes that have a
+ * canonical replacement. Manga is now included: `/media/manga/*` is superseded by
+ * the canonical `/manga/[id]` route, so leaving it renderable would give manga
+ * two crawlable URLs for the same content.
  */
 const LEGACY_PREFIXES: Record<string, string> = {
   movie: '/movie',
   anime: '/anime',
   tv: '/tv',
+  manga: '/manga',
 };
 
 /** `/media/movie/27205-inception` → `27205`. Falls back to the raw segment. */
@@ -56,17 +63,469 @@ function buildDestination(newPath: string, id: string, request: NextRequest): st
   return url.toString();
 }
 
+/**
+ * Security headers configuration.
+ * Applied to all responses via middleware for defense-in-depth.
+ */
+const SECURITY_HEADERS = {
+  // Prevent MIME type sniffing
+  'X-Content-Type-Options': 'nosniff',
+  
+  // Prevent clickjacking
+  'X-Frame-Options': 'DENY',
+  
+  // Enable XSS protection (legacy but harmless)
+  'X-XSS-Protection': '1; mode=block',
+  
+  // Referrer policy - strict origin when cross-origin
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  
+  // Permissions policy - disable dangerous features
+  'Permissions-Policy': [
+    'accelerometer=()',
+    'camera=()',
+    'geolocation=()',
+    'gyroscope=()',
+    'magnetometer=()',
+    'microphone=()',
+    'payment=()',
+    'usb=()',
+    'interest-cohort=()',
+  ].join(', '),
+  
+  // Cross-Origin policies
+  'Cross-Origin-Embedder-Policy': 'unsafe-none',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
+} as const;
+
+/**
+ * Content Security Policy for the application.
+ * Strict but allows necessary external resources (TMDB images, Adsterra scripts).
+ */
+function buildCSP(request: NextRequest): string {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://pl31625875.profitableratecpmnetwork.com https://pl31625876.profitableratecpmnetwork.com https://pl31625878.profitableratecpmnetwork.com https://ssat.pro https://www.googletagmanager.com https://www.google-analytics.com`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: https://image.tmdb.org https://s4.anilist.co https://placehold.co https://images.unsplash.com https://picsum.photos",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com",
+    "frame-src 'self' https://vidsrc.pm https://vidlink.pro https://www.2embed.cc https://vidsrc.sbs https://autoembed.co https://www.profitableratecpmnetwork.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ].join('; ');
+
+  return csp;
+}
+
+/**
+ * Rate limiting store (in-memory, per-process).
+ * For production, replace with Redis-based rate limiter.
+ */
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 100; // 100 requests per minute per IP
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now();
+  const record = rateLimitStore.get(ip);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetTime: now + RATE_LIMIT_WINDOW_MS };
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0, resetTime: record.resetTime };
+  }
+  
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count, resetTime: record.resetTime };
+}
+
+/**
+ * Bot detection - identifies known good bots vs suspicious traffic.
+ */
+function isGoodBot(userAgent: string): boolean {
+  const goodBots = [
+    'googlebot',
+    'bingbot',
+    'yandexbot',
+    'duckduckbot',
+    'baiduspider',
+    'facebookexternalhit',
+    'twitterbot',
+    'linkedinbot',
+    'slackbot',
+    'telegrambot',
+    'whatsapp',
+    'applebot',
+  ];
+  
+  const ua = userAgent.toLowerCase();
+  return goodBots.some(bot => ua.includes(bot));
+}
+
+function isSuspiciousBot(userAgent: string): boolean {
+  const badPatterns = [
+    'scrapy',
+    'crawler',
+    'spider',
+    'bot',
+    'wget',
+    'curl',
+    'python-requests',
+    'go-http-client',
+    'java/',
+    'php/',
+    'perl/',
+    'ruby/',
+    'scanner',
+    'monitor',
+    'checker',
+    'extractor',
+    'harvester',
+  ];
+  
+  const ua = userAgent.toLowerCase();
+  // Allow good bots
+  if (isGoodBot(ua)) return false;
+  
+  // Block suspicious patterns
+  return badPatterns.some(pattern => ua.includes(pattern));
+}
+
+/**
+ * `/genre/<slug>` and `/year/<year>` guards.
+ *
+ * ── Why this is middleware and not `notFound()` in the page ─────────────────
+ * `notFound()` from a Server Component renders the correct 404 body but arrives
+ * as **HTTP 200**. Verified against a production build: `/genre/nonsense`
+ * returned 200 with `NEXT_HTTP_ERROR_FALLBACK;404` in the payload. The cause is
+ * streaming — the root layout's `<html>`/`<head>` has already been flushed by the
+ * time the page component runs, so the status line is committed before the throw.
+ *
+ * For a programmatic-SEO site this is the difference between a cheap 404 and a
+ * soft 404. An open `[slug]` segment is an invitation for crawlers to probe
+ * thousands of variations, and every one of them that answers 200 with a "nothing
+ * here" body is budget spent on URLs that can never rank — and a site full of
+ * 200-status dead ends is what a "soft 404" penalty looks like to Google.
+ *
+ * Both checks here are pure constant lookups against the genre registry and the
+ * year range, so they cost nothing at the edge and cannot themselves fail. The
+ * page keeps its own `notFound()` as a second line of defence for direct renders.
+ *
+ * Aliases get a 301 rather than a 404: `/genre/sci-fi` is a plausible real URL,
+ * and the right answer is the canonical page, not a dead end.
+ */
+function guardLandingPages(pathname: string, request: NextRequest): NextResponse | null {
+  const segments = pathname.split('/').filter(Boolean);
+
+  if (segments[0] === 'genre' && segments.length === 2) {
+    const { canonicalSlug, known } = resolveGenreSlug(segments[1]);
+
+    if (!known) {
+      return new NextResponse('Not Found', {
+        status: 404,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    if (canonicalSlug !== segments[1]) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/genre/${canonicalSlug}`;
+      url.search = request.nextUrl.search;
+      // 301: the alias is permanently superseded by the canonical slug.
+      return NextResponse.redirect(url, 301);
+    }
+
+    return null;
+  }
+
+  if (segments[0] === 'year' && segments.length === 2) {
+    if (!isValidYear(segments[1])) {
+      return new NextResponse('Not Found', {
+        status: 404,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+  }
+
+  /**
+   * `/dub/[lang]` follows the same contract as `/genre/[slug]`: a known slug is
+   * let through, an alias is 301d to its canonical form, and anything outside the
+   * registry is a real 404.
+   *
+   * The 404 matters more here than on a genre page. `dub` is a short, guessable
+   * word, so a crawler probing `/dub/hindi-720p` or `/dub/hd` would otherwise mint
+   * a fresh URL for every guess — each one a soft 404 spending crawl budget that
+   * the language pages need. The registry is a closed set of nine, so this is a
+   * constant-time rejection.
+   */
+  if (segments[0] === 'dub' && segments.length === 2) {
+    const { canonicalSlug, known } = resolveDubLanguage(segments[1]);
+
+    if (!known) {
+      return new NextResponse('Not Found', {
+        status: 404,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    if (canonicalSlug !== segments[1]) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/dub/${canonicalSlug}`;
+      url.search = request.nextUrl.search;
+      // 301: `/dub/hindi-dubbed` and `/dub/hindi` are one page, permanently.
+      return NextResponse.redirect(url, 301);
+    }
+
+    return null;
+  }
+
+  return null;
+}
+
+/**
+ * Episode URL contract.
+ *
+ * `/watch|tv|tv/...` and `/watch|download/anime/...` each have exactly one
+ * canonical slug, derived from the numbers already in the path (see
+ * `lib/episode-slug.ts` for why the title is deliberately not part of it). This
+ * enforces that:
+ *
+ *   - a well-formed path with a non-canonical slug → **301** to the canonical one
+ *   - a malformed path (missing slug, extra segments, `episode-0`, no digits) → **404**
+ *
+ * ── Why middleware, once more ────────────────────────────────────────────────
+ * Verified against a production build: `permanentRedirect()` from the page
+ * component returned **200** with a client-side navigation rather than a 308, and
+ * `notFound()` soft-404'd for the same reason — the root layout's shell has already
+ * been flushed by the time the page component runs. So a page-level redirect
+ * cannot express "this is not the address", it can only *suggest* it. Doing it
+ * here is the only way these answers are real HTTP statuses.
+ *
+ * That matters more than usual on a site that generates tens of thousands of
+ * episode URLs: an open `[...slug]` is an invitation to probe thousands of
+ * variants per episode, and every 200-status dead end is crawl budget spent on a
+ * page that can never rank.
+ */
+function guardEpisodePages(pathname: string, request: NextRequest): NextResponse | null {
+  const segments = pathname.split('/').filter(Boolean);
+  const [first, second] = segments;
+
+  // Cheap prefix check so this does not run a regex on every request on the site.
+  const isEpisodeArea =
+    (first === 'watch' || first === 'download') && (second === 'tv' || second === 'anime');
+  if (!isEpisodeArea) return null;
+
+  // `/watch/tv` and `/watch/tv/1399` on their own are not episode pages; those are
+  // malformed shapes for this family, and nothing renders them.
+  const parsed = parseEpisodePath(pathname);
+  if (!parsed) {
+    return new NextResponse('Not Found', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
+
+  const canonical = canonicalEpisodePath(pathname);
+  if (canonical && canonical !== pathname) {
+    const url = request.nextUrl.clone();
+    url.pathname = canonical;
+    // Marketing params survive the hop so paid attribution is not lost; anything
+    // else is dropped, because carrying stale params would mint a new URL.
+    url.search = '';
+    for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid']) {
+      const value = request.nextUrl.searchParams.get(key);
+      if (value) url.searchParams.set(key, value);
+    }
+    // 301, not 302: the canonical address for a given episode never changes.
+    return NextResponse.redirect(url, 301);
+  }
+
+  return null;
+}
+
+/**
+ * Season landing page contract: `/tv/[id]/season-[n]`.
+ *
+ * ── The 404 half, which is the part that matters ─────────────────────────────
+ * `/tv/[id]/season-[season]` is a new, shallow, guessable shape: two segments
+ * under a numeric id, ending in a word a crawler can enumerate (`season-1`,
+ * `season-2`, …). Without a guard, every probe renders the page component, which
+ * calls TMDB, and any variant that resolves answers 200. That is an unbounded set
+ * of URLs competing for crawl budget with the pages that actually have demand.
+ *
+ * So the path is parsed here first and anything malformed is a real 404 before
+ * rendering. The bounds are deliberately generous static ceilings, not the real
+ * counts — the real count is only knowable upstream, and middleware cannot ask.
+ * Their job is to make a probe finish cheaply; the page's own `notFound()` still
+ * catches a well-formed request for a season that does not exist.
+ *
+ * ── Why the canonical case has no redirect ───────────────────────────────────
+ * Unlike an episode URL there is only one spelling of this path, so a renderable
+ * request is already canonical and simply falls through. The alias that would
+ * need a redirect — `/tv/1399/s1` — is not a shape anyone links to and is
+ * rejected as malformed rather than 301d, which keeps this function to one job.
+ */
+const SEASON_SLUG = /^season-(\d+)$/;
+
+function guardSeasonPages(pathname: string, request: NextRequest): NextResponse | null {
+  const segments = pathname.split('/').filter(Boolean);
+
+  // Cheap prefix check before any regex runs on the hot path.
+  if (segments[0] !== 'tv' || segments.length !== 3) return null;
+
+  const match = SEASON_SLUG.exec(segments[2]);
+  const seasonNumber = match ? Number.parseInt(match[1], 10) : Number.NaN;
+
+  /**
+   * Season 0 is rejected on purpose. TMDB uses it for specials and
+   * behind-the-scenes extras, which have no episode numbering anyone searches
+   * for, so the page would be thin content with nothing on it.
+   */
+  if (!match || !Number.isFinite(seasonNumber) || seasonNumber < 1 || seasonNumber > MAX_SEASON) {
+    return new NextResponse('Not Found', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
+
+  return null;
+}
+
+/** Stamps the standard security headers onto any response this middleware returns. */
+function withSecurityHeaders(response: NextResponse, withCsp: boolean, request: NextRequest): NextResponse {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  if (withCsp) response.headers.set('Content-Security-Policy', buildCSP(request));
+  return response;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const segments = pathname.split('/').filter(Boolean);
+  const response = NextResponse.next();
 
+  const userAgent = request.headers.get('user-agent') || '';
+  const accept = request.headers.get('accept') || '';
+  const wantsHtml = accept.includes('text/html');
+
+  const isBot = isGoodBot(userAgent);
+  response.headers.set('x-is-bot', isBot ? '1' : '0');
+
+  // ── URL Contract Guards ──────────────────────────────────────────────────
+  // Run first, and before the header work below, because both can end the request
+  // with a 301/404. Whatever they return goes through `withSecurityHeaders` so an
+  // early exit does not silently drop the security headers the rest of the
+  // pipeline attaches — the pre-existing `/media/*` redirect had that gap.
+  const guard =
+    guardLandingPages(pathname, request) ??
+    guardSeasonPages(pathname, request) ??
+    guardEpisodePages(pathname, request);
+  if (guard) return withSecurityHeaders(guard, wantsHtml, request);
+
+  // ── Legacy Redirects ─────────────────────────────────────────────────────
   // ['media', '<type>', '<id-slug>']
-  if (segments.length !== 3 || segments[0] !== 'media') return NextResponse.next();
+  if (segments.length === 3 && segments[0] === 'media') {
+    const basePath = LEGACY_PREFIXES[segments[1]];
+    if (basePath) {
+      return NextResponse.redirect(buildDestination(basePath, extractId(segments[2]), request), 308);
+    }
+  }
 
-  const basePath = LEGACY_PREFIXES[segments[1]];
-  if (!basePath) return NextResponse.next();
+  // ── Security Headers ─────────────────────────────────────────────────────
+  // Apply to all responses
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
 
-  return NextResponse.redirect(buildDestination(basePath, extractId(segments[2]), request), 308);
+  // CSP - only for HTML responses (not API, static assets)
+  if (wantsHtml) {
+    response.headers.set('Content-Security-Policy', buildCSP(request));
+  }
+
+  // ── Rate Limiting ────────────────────────────────────────────────────────
+  // Skip rate limiting for static assets and known good bots
+  const isStaticAsset = pathname.startsWith('/_next/') ||
+                        pathname.startsWith('/assets/') ||
+                        pathname.includes('.') ||
+                        pathname === '/favicon.ico' ||
+                        pathname === '/robots.txt' ||
+                        pathname === '/sitemap.xml';
+
+  if (!isStaticAsset && !isGoodBot(userAgent)) {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               request.headers.get('x-real-ip') ||
+               'unknown';
+
+    const { allowed, remaining, resetTime } = checkRateLimit(ip);
+
+    response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX_REQUESTS));
+    response.headers.set('X-RateLimit-Remaining', String(remaining));
+    response.headers.set('X-RateLimit-Reset', String(Math.ceil(resetTime / 1000)));
+
+    if (!allowed) {
+      return new NextResponse('Too Many Requests', {
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil((resetTime - Date.now()) / 1000)),
+          'Content-Type': 'text/plain',
+        },
+      });
+    }
+  }
+
+  // ── Bot Protection ──────────────────────────────────────────────────────
+  // Block suspicious bots on non-API routes (but allow them on /api/health for monitoring)
+  if (!pathname.startsWith('/api/health') && isSuspiciousBot(userAgent)) {
+    // Return 403 for suspicious bots, but don't block known good bots
+    if (!isGoodBot(userAgent) && !pathname.startsWith('/api/')) {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+  }
+
+  // ── Search Param Validation ─────────────────────────────────────────────
+  // Sanitize search params to prevent injection
+  const searchParams = request.nextUrl.searchParams;
+  const sanitizedParams = new URLSearchParams();
+  
+  for (const [key, value] of searchParams.entries()) {
+    // Only allow known safe parameters.
+    //
+    // `page` is here for the `/genre/[slug]` and `/year/[year]` landing pages.
+    // Without it, requesting page 2 of a genre would strip the parameter, redirect
+    // 302 back to page 1, and the pagination would be unreachable — the sanitizer
+    // below removes anything not on this list, so a missing entry silently
+    // disables a feature rather than failing loudly.
+    const allowedParams = ['query', 'tab', 'item', 'season', 'episode', 'dub', 'lang', 'page',
+                           'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+                           'gclid', 'fbclid'];
+    if (allowedParams.includes(key)) {
+      // Sanitize value - remove potential XSS
+      const sanitized = value.replace(/[<>'"&]/g, '');
+      if (sanitized.length <= 200) { // Reasonable length limit
+        sanitizedParams.set(key, sanitized);
+      }
+    }
+  }
+  
+  // If params were sanitized, redirect to clean URL
+  if (sanitizedParams.toString() !== searchParams.toString()) {
+    const url = request.nextUrl.clone();
+    url.search = sanitizedParams.toString();
+    return NextResponse.redirect(url, 302);
+  }
+  
+  return response;
 }
 
 export const config = {
@@ -74,6 +533,14 @@ export const config = {
    * Matched only on the three legacy prefixes, so the middleware never runs for
    * normal traffic. Running it on every request would add Edge latency to the
    * hot path for no benefit.
+   * 
+   * Extended to also run on all routes for security headers and rate limiting.
    */
-  matcher: ['/media/movie/:path*', '/media/anime/:path*', '/media/tv/:path*'],
+  matcher: [
+    '/media/movie/:path*', 
+    '/media/anime/:path*', 
+    '/media/tv/:path*', 
+    '/media/manga/:path*',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|assets/).*)',
+  ],
 };

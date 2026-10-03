@@ -1,33 +1,24 @@
 import { fetchFromAniList } from "@/lib/anilist";
 import { type Media } from "@/lib/types";
 import MediaCarousel from "./media-carousel";
+import { getEnhancedAnimeRecommendations } from "./anime-seo-anchors";
 
 async function RecommendedMedia({ media }: { media: Media }) {
   if (!media.genres || media.genres.length === 0) {
     return null;
   }
 
-  // Fetch recommendations based on the first genre
-  const recommendations = await fetchFromAniList({
-    genre_in: [media.genres[0]],
-    sort: ["SCORE_DESC"],
-    perPage: 15,
-    type: media.type,
-  });
+  // Fetch enhanced recommendations with SEO anchors
+  const enhancedItems = await getEnhancedAnimeRecommendations(media, 12);
 
-  // Filter out the current media from the recommendations
-  const filteredRecommendations = recommendations.filter(
-    (item) => item.id !== media.id
-  );
-
-  if (filteredRecommendations.length === 0) {
+  if (enhancedItems.length === 0) {
     return null;
   }
 
   return (
     <MediaCarousel
       title="More Like This"
-      items={filteredRecommendations}
+      items={enhancedItems}
     />
   );
 }
