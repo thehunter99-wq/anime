@@ -11,7 +11,7 @@ import MediaGrid from '@/components/media-grid';
 import TvGrid from '@/components/tv-grid';
 import Pagination from '@/components/pagination';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner, NativeBannerAd } from '@/components/ads';
+import { AdBanner } from '@/components/ads';
 
 type Props = {
   searchParams: Promise<{ page?: string }>;
@@ -172,7 +172,6 @@ export default async function SubbedPage({ searchParams }: Props) {
               {anime.length > 0 && <MediaGrid title="Subbed Anime" items={anime} />}
               <AdBanner />
               {animeTv.length > 0 && <TvGrid title="Subtitled Anime Series" items={animeTv} />}
-              <NativeBannerAd />
             </>
           )}
 

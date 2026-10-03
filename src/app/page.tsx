@@ -17,7 +17,7 @@ import TvGrid from '@/components/tv-grid';
 import HeroCarousel from '@/components/hero-carousel';
 import MovieHeroCarousel from '@/components/movie-hero-carousel';
 import TvHeroCarousel from '@/components/tv-hero-carousel';
-import { AdBanner, AdSlot, NativeBannerAd } from '@/components/ads';
+import { AdBanner, AdSlot } from '@/components/ads';
 import SearchFilterTabs from '@/components/search-filter-tabs';
 import ContinueWatching from '@/components/continue-watching';
 
@@ -210,7 +210,6 @@ export default async function Home({
             <div className="container mx-auto px-4 pt-6 sm:px-6 lg:px-8">
               <AdBanner />
             </div>
-            <NativeBannerAd />
             <div className="container mx-auto space-y-12 px-4 py-8 sm:px-6 lg:px-8">
               <ContinueWatching />
               {tab === 'anime' && (

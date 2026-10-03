@@ -11,7 +11,7 @@ import MovieGrid from '@/components/movie-grid';
 import TvGrid from '@/components/tv-grid';
 import Pagination from '@/components/pagination';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner, NativeBannerAd } from '@/components/ads';
+import { AdBanner } from '@/components/ads';
 
 type Props = {
   params: Promise<{ lang: string }>;
@@ -191,9 +191,8 @@ export default async function DubLanguagePage({ params, searchParams }: Props) {
                  <MovieGrid title={`${language.label} Movies`} items={movies} />
                )}
                <AdBanner />
-               {tv.length > 0 && <TvGrid title={`${language.label} Web Series`} items={tv} />}
-               <NativeBannerAd />
-            </>
+{tv.length > 0 && <TvGrid title={`${language.label} Web Series`} items={tv} />}
+             </>
           )}
 
           <Pagination path={canonicalPath} page={currentPage} hasNext={hasNext} />

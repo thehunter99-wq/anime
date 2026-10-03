@@ -17,9 +17,21 @@
  *   - 1 instance  → fills, earns
  *   - 2+ instances → one fills, the rest stay empty forever
  *
- * This component also GUARDS against mounting twice: the first instance claims
- * the container id and later ones render nothing, so a duplicate id can never
- * reach the DOM in the first place.
+ * There is therefore exactly ONE `NativeBannerAd` in the tree, in the root
+ * layout. An earlier version tried to police this at runtime with a module-level
+ * `claimed` flag so that extra instances would render `null`. That was wrong in a
+ * way worth recording, because the symptom looked unrelated:
+ *
+ *   - The module is shared across requests on the server. The first request
+ *     rendered the ad and set `claimed = true`; every request after it rendered
+ *     nothing. Server output therefore depended on request order.
+ *   - On the client the flag started `false`, so the first render did not match
+ *     whatever the server had emitted. That surfaced as a hydration mismatch on
+ *     the homepage, in a component far from the ad code.
+ *
+ * A guard whose result depends on mutable state outside React cannot be correct
+ * under SSR. The duplicate instances are removed instead, and this component is
+ * a plain stateless render — no flag, no claim, nothing to desync.
  *
  * To get four banners you need four ZONES. Create three more in the Adsterra
  * dashboard, put their hashes in `src/config/ads.ts` as EXTRA_NATIVE_ZONES, and
@@ -30,7 +42,6 @@
  * instances on one page because each slot is given a unique container id.
  */
 import Script from 'next/script';
-import { useEffect } from 'react';
 
 import {
   AD_RESERVED_HEIGHT,
@@ -38,9 +49,6 @@ import {
   NATIVE_BANNER_URL,
 } from '@/config/ads';
 import { AdFrame, AdSkeleton, useAdFilled } from './primitives';
-
-/** Set once per page load by whichever instance mounts first. */
-let claimed = false;
 
 export function NativeBannerAd({
   className,
@@ -50,15 +58,8 @@ export function NativeBannerAd({
   label?: string;
 }) {
   const { filled } = useAdFilled(NATIVE_BANNER_CONTAINER_ID);
-  const owns = NATIVE_BANNER_CONTAINER_ID !== '' && !claimed;
 
-  // Claim in an effect, never during render: render must stay free of side
-  // effects so the server HTML and the first client render agree.
-  useEffect(() => {
-    if (owns) claimed = true;
-  }, [owns]);
-
-  if (!NATIVE_BANNER_CONTAINER_ID || !owns) return null;
+  if (!NATIVE_BANNER_CONTAINER_ID) return null;
 
   return (
     <>

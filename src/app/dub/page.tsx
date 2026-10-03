@@ -9,7 +9,7 @@ import Header from '@/components/header';
 import MovieGrid from '@/components/movie-grid';
 import TvGrid from '@/components/tv-grid';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner, NativeBannerAd } from '@/components/ads';
+import { AdBanner } from '@/components/ads';
 
 /**
  * Dubbed hub: `/dub`.
@@ -123,9 +123,8 @@ export default async function DubHubPage() {
            )}
            <AdBanner />
            {tv.length > 0 && (
-             <TvGrid title={`Popular ${featured.label} Dubbed Web Series`} items={tv} />
-           )}
-           <NativeBannerAd />
+<TvGrid title={`Popular ${featured.label} Dubbed Web Series`} items={tv} />
+            )}
         </div>
       </main>
 
