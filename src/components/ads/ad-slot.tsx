@@ -37,7 +37,6 @@ import { useId } from 'react';
 import {
   AD_RESERVED_HEIGHT,
   ADSTERRA_KEY,
-  IN_CONTENT_CONTAINER_ID,
   IN_CONTENT_ZONE_URL,
 } from '@/config/ads';
 import { AdFrame, AdSkeleton, useAdFilled } from './primitives';
@@ -69,11 +68,30 @@ export function AdSlot({ className, label, format = 'auto' }: AdSlotProps) {
         placeholder at least tells you the slot exists and is waiting.
 
         `z-10` keeps the creative above the skeleton while both are present.
+
+        ── The id must be PER-SLOT, not the shared zone id ────────────────────
+        An earlier revision set `id={IN_CONTENT_CONTAINER_ID}`, which is a module
+        constant. Every slot therefore rendered the SAME id, so a page with four
+        slots shipped four elements with one duplicate id. Two consequences, both
+        observed live:
+
+          - `getElementById` returns only the first match, so slots 2-4 polled
+            element #1 forever and could never reach their own filled state.
+          - Duplicate ids are invalid HTML and are a classic trigger for React's
+            "tree will be regenerated on the client" recovery — which wipes the
+            ad container the zone script had just filled.
+
+        The per-slot id from `useId` is unique and stable across SSR and client,
+        so the container the script fills is the container the poll watches.
+        The zone is selected by the SCRIPT URL, not by the container id, so a
+        per-slot container costs nothing: one zone script fills every matching
+        container on the page.
       */}
       <div
-        id={IN_CONTENT_CONTAINER_ID || slotId}
+        id={slotId}
         data-ad-slot-id={slotId}
         data-ad-format={format}
+        data-ad-zone={ADSTERRA_KEY}
         className="adsterra relative z-10 w-full"
         suppressHydrationWarning
       />

@@ -31,9 +31,25 @@ export function useAdFilled(
   useEffect(() => {
     const startedAt = Date.now();
 
+    /**
+     * `getElementById` returns the FIRST match only. If a second element shares
+     * the id, every slot after the first polls the wrong node, reports the wrong
+     * fill state, and can leave React regenerating the tree. That bug shipped
+     * once already (a shared module-level container id across four slots), so it
+     * is checked here rather than trusted.
+     */
+    const el = document.getElementById(containerId);
+    if (el && document.querySelectorAll(`[id="${containerId}"]`).length > 1) {
+      console.error(
+        `[adsterra] duplicate container id "${containerId}" found. ` +
+          'getElementById only returns the first match, so the other slots will ' +
+          'never reach a filled state. Every slot needs its own unique id.'
+      );
+    }
+
     const check = () => {
-      const el = document.getElementById(containerId);
-      if (el && el.childElementCount > 0) {
+      const node = document.getElementById(containerId);
+      if (node && node.childElementCount > 0) {
         setFilled(true);
         return true;
       }

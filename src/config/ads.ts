@@ -166,10 +166,16 @@ export const IN_CONTENT_ZONE_URL = ADSTERRA_KEY
 export const IN_CONTENT_LOADER_URL = IN_CONTENT_ZONE_URL;
 
 /**
- * Container id the in-content zone loader scans for. Same rule as the native
- * banner: `container-<zone-hash>`.
+ * NOTE: there is deliberately NO shared `IN_CONTENT_CONTAINER_ID`.
+ *
+ * A single constant container id looks right — the native banner genuinely needs
+ * one — but for in-content it put four slots on a page into a duplicate-id
+ * collision. `getElementById` only ever returned the first match, so slots 2-4
+ * watched the wrong element, and duplicate ids are invalid HTML that can make
+ * React regenerate the tree and wipe the freshly-filled container. Each slot uses
+ * its own `useId`-derived id instead; the zone is selected by the script URL, so
+ * one zone script still fills every container it finds.
  */
-export const IN_CONTENT_CONTAINER_ID = ADSTERRA_KEY ? `container-${ADSTERRA_KEY}` : '';
 
 /**
  * The zone hash is the first path segment after the hostname
