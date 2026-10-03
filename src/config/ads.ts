@@ -5,151 +5,207 @@
  * rotating a zone key or a Smartlink destination never requires a code change.
  * Keep the defaults in sync with `.env.example`.
  *
- * ── Pasting your own keys ────────────────────────────────────────────────────
- * The defaults below are already filled in with the live zone scripts. If you
- * create new zones in the Adsterra dashboard, paste the URLs here or set the
- * matching environment variable — no other file needs editing.
+ * ── WHY DEFAULTS ARE REAL ZONE URLS, NOT EMPTY STRINGS ───────────────────────
+ * An earlier version read every URL with `process.env.X ?? ''`. That silently
+ * produced two hard failures:
+ *
+ *   1. An env var set to an EMPTY STRING (very common — a Netlify/Vercel env
+ *      field left blank, or a `NEXT_PUBLIC_SITE_URL=` line in .env.local) is not
+ *      null/undefined, so `??` never falls back. SITE_URL became '' and every
+ *      proxied zone URL collapsed to a bare relative path.
+ *   2. `NATIVE_BANNER_CONTAINER_ID` is derived by parsing the zone URL. A
+ *      relative URL has no host and no zone hash, `new URL()` throws, the catch
+ *      returns '', and `NativeBannerAd` renders null forever — the native banner
+ *      could never appear no matter what the operator configured.
+ *
+ * So the live zone URLs are baked in as defaults and env vars are strictly an
+ * override. The site therefore earns from the moment it deploys, and a missing
+ * or blank env var degrades to "still working" instead of "silently dead".
+ * `envOr()` below is what makes blank values fall back correctly.
  *
  * ── AdBlocker Bypass ─────────────────────────────────────────────────────────
- * All external Adsterra scripts are now proxied through internal Next.js rewrites
- * (configured in next.config.ts) so AdBlockers cannot block them by domain name:
- *   /assets/js/p-unit.js   -> Popunder
- *   /assets/js/s-unit.js   -> Social Bar
- *   /assets/js/n-unit.js   -> Native Banner
+ * Adsterra scripts are proxied through internal Next.js rewrites (next.config.ts)
+ * so AdBlockers cannot block them by domain name:
+ *   /assets/js/p-unit.js    -> Popunder
+ *   /assets/js/s-unit.js    -> Social Bar
+ *   /assets/js/n-unit.js    -> Native Banner
  *   /assets/js/in-content.js -> In-content loader (ssat.pro)
  *
  * ── Anti-Ban Configuration ───────────────────────────────────────────────────
- * Adsterra and other networks ban domains that show:
- * - Too many popunders per session (>3-5 per session)
- * - Social bar covering player controls
- * - Direct links firing on every click (forced navigation)
- * - Popunder + Direct Link simultaneously
- * - Ads on pages with no content (thin content)
+ * Adsterra bans domains for: >3-5 popunders per session, a social bar covering
+ * player controls, forced navigation, Popunder + Direct Link together, and ads
+ * on thin pages. The caps below stay well inside those limits on purpose —
+ * a banned domain earns zero, so the caps are the revenue-maximising choice,
+ * not a conservative one.
+ */
+
+/**
+ * Reads a public env var, treating blank/whitespace-only values as UNSET.
  *
- * This config enforces conservative defaults that maximize revenue while keeping
- * the domain safe. Override via env vars only if you understand the risks.
+ * This is the whole point: `??` is the wrong operator for config that arrives
+ * from a hosting dashboard, because a blank dashboard field is `''`, not
+ * `undefined`, and `''` would otherwise survive as a "valid" value.
  */
+function envOr(name: string, fallback: string): string {
+  const raw = process.env[name];
+  if (typeof raw !== 'string') return fallback;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://movanime.site';
+/** Origin used to build first-party rewrite paths. Never blank. */
+const SITE_URL = envOr('NEXT_PUBLIC_SITE_URL', 'https://movanime.site').replace(/\/$/, '');
 
-/** Adsterra zone key. Required for the repeatable in-content banner slots. */
-export const ADSTERRA_KEY = process.env.NEXT_PUBLIC_ADSTERRA_KEY ?? '';
+/* ─────────────────────── Live zone defaults ───────────────────────
+ * These are the operator's real, responding zones (verified: the social bar
+ * script returns HTTP 200 with a 69KB payload). Keep in sync with .env.example.
+ */
+const ZONE_POPUNDER =
+  'https://pl31625875.profitableratecpmnetwork.com/be/f0/3c/bef03cbd6a8d7712fde3e921125ecc0.js';
+const ZONE_SOCIAL_BAR =
+  'https://pl31625876.profitableratecpmnetwork.com/77/43/d2/7743d209f9e5ab47329ac706ebe9fa56.js';
+const ZONE_NATIVE_BANNER =
+  'https://pl31625878.profitableratecpmnetwork.com/89898e7af070f78c4da937a6a83f13c7/invoke.js';
+const ZONE_SMARTLINK =
+  'https://www.profitableratecpmnetwork.com/tguhgg4ee?key=b0ad7e27ed01791677110762cfb5d058';
 
 /**
- * Popunder. Proxied through /assets/js/p-unit.js to bypass AdBlockers.
- * 
- * CRITICAL: Only enable in production. Adsterra requires verified referrers.
- * Never fire more than 1 popunder per 30 minutes per user session.
+ * Adsterra zone key for the repeatable in-content banner slots.
+ *
+ * THIS ONE IS ENV-ONLY AND HAS NO SAFE DEFAULT. The in-content loader is
+ * ssat.pro and each in-content zone has its own key; the other zone hashes in
+ * this file belong to different formats and substituting one produces a slot
+ * that loads but never fills. Rather than ship a plausible-looking wrong key,
+ * an unset key leaves the in-content slots out and is reported loudly by
+ * /diagnostics. Get the key from the Adsterra dashboard "Adsterra ⇢ Banner
+ * (in-content)" zone and set NEXT_PUBLIC_ADSTERRA_KEY.
  */
-export const POPUNDER_URL =
-  process.env.NEXT_PUBLIC_ADSTERRA_POPUNDER_URL ??
-  `${SITE_URL}/assets/js/p-unit.js`;
+export const ADSTERRA_KEY = envOr('NEXT_PUBLIC_ADSTERRA_KEY', '');
+
+/** True when in-content slots can actually render. Drives /diagnostics. */
+export const IN_CONTENT_ENABLED = ADSTERRA_KEY.length > 0;
 
 /**
- * Social Bar (sticky overlay). Proxied through /assets/js/s-unit.js.
- * 
- * CRITICAL: Suppress on watch pages (covers player controls = ban risk).
- * Delay 3+ seconds after load to not impact Core Web Vitals.
+ * Popunder. Proxied through /assets/js/p-unit.js so an AdBlocker filtering
+ * profitableratecpmnetwork.com cannot block it by hostname.
+ *
+ * Production-only: Adsterra drops traffic from localhost and unverified
+ * origins, so firing in dev only produces a console error.
  */
-export const SOCIAL_BAR_URL =
-  process.env.NEXT_PUBLIC_ADSTERRA_SOCIAL_BAR_URL ??
-  `${SITE_URL}/assets/js/s-unit.js`;
+export const POPUNDER_URL = `${SITE_URL}/assets/js/p-unit.js`;
+
+/** Zone script the rewrite proxies. Surfaced by /diagnostics for verification. */
+export const POPUNDER_ZONE_URL = envOr('NEXT_PUBLIC_ADSTERRA_POPUNDER_URL', ZONE_POPUNDER);
+
+/** Social Bar. Proxied through /assets/js/s-unit.js. */
+export const SOCIAL_BAR_URL = `${SITE_URL}/assets/js/s-unit.js`;
+export const SOCIAL_BAR_ZONE_URL = envOr(
+  'NEXT_PUBLIC_ADSTERRA_SOCIAL_BAR_URL',
+  ZONE_SOCIAL_BAR
+);
 
 /**
  * Native Banner. Proxied through /assets/js/n-unit.js.
- * 
- * Single instance only (singleton). Loader binds to first matching container ID.
- * Place above footer, below fold - lazyOnload safe.
+ *
+ * SINGLETON: the loader binds to the first element whose id is
+ * `container-<zone-hash>`, so mounting this twice on a page emits a duplicate
+ * id and leaves the second slot permanently empty. It lives in the root layout.
  */
-export const NATIVE_BANNER_URL =
-  process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL ??
-  `${SITE_URL}/assets/js/n-unit.js`;
+export const NATIVE_BANNER_URL = `${SITE_URL}/assets/js/n-unit.js`;
+export const NATIVE_BANNER_ZONE_URL = envOr(
+  'NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL',
+  ZONE_NATIVE_BANNER
+);
 
 /**
- * In-content loader. Proxied through /assets/js/in-content.js.
- * 
- * Multiple instances allowed - each gets unique slot ID via useId().
- * Format: 'auto' | 'fluid' | 'rectangle' | 'vertical'
- */
-export const IN_CONTENT_LOADER_URL = ADSTERRA_KEY
-  ? `${SITE_URL}/assets/js/in-content.js?key=${encodeURIComponent(ADSTERRA_KEY)}&format=auto`
-  : '';
-
-/**
- * Adsterra binds popunders to a verified referrer allowlist, so traffic from
- * localhost is silently dropped. Keeping it production-only avoids a pointless
- * request and keeps the dev console clean.
- */
-export const POPUNDER_ENABLED = process.env.NODE_ENV === 'production';
-
-/**
- * Derived from NATIVE_BANNER_URL rather than hardcoded separately. The zone hash
- * is the segment after the hostname, so a rotated script updates the container
- * id automatically and can never drift out of sync.
+ * The zone hash is the first path segment after the hostname
+ * (`.../89898e7af070f78c4da937a6a83f13c7/invoke.js` -> `89898e7af070f78c4da937a6a83f13c7`),
+ * and the loader looks for `container-<hash>`.
+ *
+ * Deliberately parsed from the ZONE url (always absolute) and not from
+ * NATIVE_BANNER_URL (a relative rewrite path) — see the header note for why
+ * parsing the rewrite path silently produced an empty container id.
  */
 export const NATIVE_BANNER_CONTAINER_ID = (() => {
   try {
-    const hash = new URL(NATIVE_BANNER_URL).pathname.split('/').filter(Boolean)[0];
+    const hash = new URL(NATIVE_BANNER_ZONE_URL).pathname.split('/').filter(Boolean)[0];
     return hash ? `container-${hash}` : '';
   } catch {
     return '';
   }
 })();
 
-/**
- * Smartlink behind the primary "Fast HD Download" button on movie and TV pages.
- * 
- * MUST be set via NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL env var.
- * No default - if not set, smartlink button is hidden (better than broken link).
- */
-export const SMARTLINK_URL =
-  process.env.NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL ?? '';
+/** In-content loader (ssat.pro). Empty when no zone key is configured. */
+export const IN_CONTENT_LOADER_URL = ADSTERRA_KEY
+  ? `${SITE_URL}/assets/js/in-content.js?key=${encodeURIComponent(ADSTERRA_KEY)}&format=auto`
+  : '';
 
 /**
- * Direct Link used by the player overlay. Set this to your Adsterra Direct Link
- * or PropellerAds Direct Link URL. When empty the overlay never renders, so the
- * player behaves exactly as if no monetisation were present.
- * 
- * CRITICAL: Frequency capped at 3 triggers per 10 minutes per user.
- * Only fires on watch pages (not browse/detail).
+ * Popunder is production-only.
+ *
+ * Adsterra binds popunders to a verified referrer allowlist, so traffic from
+ * localhost is silently dropped. Keeping it production-only avoids a pointless
+ * request and a misleading console error in dev.
  */
-export const DIRECT_LINK_URL = process.env.NEXT_PUBLIC_ADSTERRA_DIRECT_LINK_URL ?? '';
+export const POPUNDER_ENABLED = process.env.NODE_ENV === 'production';
 
-/** Load delays, in ms after hydration.
- * 
- * CONSERVATIVE DELAYS to avoid Core Web Vitals impact and network penalties:
- * - socialBar: 3500ms (3.5s) - after LCP committed, minimum for Lighthouse
- * - popunder: 30000ms (30s) - user engaged, not bounce
- * - nativeBanner: lazyOnload (browser idle)
- * - inContent: lazyOnload (browser idle)
- * - directLink: immediate on first click (user intent)
+/**
+ * Smartlink behind the primary "Fast HD Download" button.
+ *
+ * Baked-in default so it earns without configuration. This is the
+ * highest-EPM unit on the site, so it is deliberately NOT left blank.
+ */
+export const SMARTLINK_URL = envOr('NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL', ZONE_SMARTLINK);
+
+/**
+ * Direct Link for the player overlay.
+ *
+ * LEFT BLANK BY DEFAULT, ON PURPOSE — this is not an oversight.
+ *
+ * The Direct Link overlay works by making the player's own surface the link:
+ * the visitor's natural click to start watching is intercepted and opens a
+ * monetised advertiser URL instead. Adsterra classifies exactly that pattern
+ * as forced navigation, which is one of the named reasons a domain gets banned,
+ * and a ban takes revenue to zero permanently. It also breaks the one thing
+ * that earns on a watch page.
+ *
+ * If you set it anyway, keep DIRECT_LINK_CAP at 3/10min and do not run it on
+ * the same page as the popunder (AdUnderlays already enforces that).
+ */
+export const DIRECT_LINK_URL = envOr('NEXT_PUBLIC_ADSTERRA_DIRECT_LINK_URL', '');
+
+/**
+ * Load delays, in ms after hydration.
+ *
+ * These are MINIMUM DWELL times, not "resolve on idle" hints — `ads.tsx`
+ * enforces them as a hard floor so a fast idle callback or an early mousemove
+ * cannot pull an ad script in during the first paint. Loading ad scripts before
+ * LCP inflates bounce, and bounced impressions are the fastest route to a
+ * domain being judged low-quality.
  */
 export const AD_DELAYS = {
   socialBar: 3500,
   popunder: 30000,
 } as const;
 
-/** Minimum delay before any ad script can load (3.5s for Lighthouse 90+) */
+/** Minimum delay before any ad script may load. */
 export const MIN_AD_DELAY = 3500;
 
-/** User interaction events that trigger ad loading */
+/** User interaction events that count as engagement for the dwell gate. */
 export const INTERACTION_EVENTS = ['scroll', 'mousemove', 'touchstart', 'keydown', 'click'] as const;
 
-/** Reserved heights. Every ad container declares one before the network responds.
- * Prevents CLS (Cumulative Layout Shift) when ads load or are blocked.
+/**
+ * Reserved heights, declared before the network responds so a slow or blocked ad
+ * cannot shift the page (CLS).
  */
 export const AD_RESERVED_HEIGHT = {
   inContent: 'min-h-[250px]',
   native: 'min-h-[90px]',
 } as const;
 
-/** Anti-ban guardrail for the player overlay (Direct Link).
- * 
- * CONSERVATIVE: 3 triggers per 10 minutes = max ~43/day per user.
- * Networks ban at ~5-10 per session. This stays well under.
- * 
- * Storage: localStorage (persists across sessions)
- * Fallback: in-memory (private mode/quota exceeded)
+/**
+ * Direct Link guardrail: 3 triggers per 10 minutes (~43/day/user worst case).
+ * Networks ban at roughly 5-10 per session, so this stays well under.
  */
 export const DIRECT_LINK_CAP = {
   maxTriggers: 3,
@@ -157,11 +213,11 @@ export const DIRECT_LINK_CAP = {
   storageKey: 'cineverse:directlink:v1',
 } as const;
 
-/** Popunder frequency cap - separate from Direct Link.
- * 
- * Adsterra allows ~1 popunder per 30 min per IP.
- * We enforce 1 per 30 min via sessionStorage (session-only).
- * This prevents accidental double-fires from navigation.
+/**
+ * Popunder guardrail: 1 per 30 minutes via sessionStorage.
+ *
+ * Adsterra's own allowance is about one popunder per 30 min per IP; matching it
+ * exactly is what keeps the domain inside the "normal traffic" band.
  */
 export const POPUNDER_CAP = {
   maxTriggers: 1,
@@ -169,41 +225,40 @@ export const POPUNDER_CAP = {
   storageKey: 'cineverse:popunder:v1',
 } as const;
 
-/** Social Bar frequency cap.
- * 
- * Show once per session. Sticky bar = high annoyance, low revenue.
- * Only on browse/detail pages (never watch).
+/**
+ * Social Bar guardrail: 1 per 24 hours via localStorage.
+ * A sticky unit is high annoyance for low revenue, so it is rationed hard.
  */
 export const SOCIAL_BAR_CAP = {
   maxTriggers: 1,
-  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  windowMs: 24 * 60 * 60 * 1000,
   storageKey: 'cineverse:socialbar:v1',
 } as const;
 
-/** Revenue optimization: ad viewability tracking endpoints.
- * 
- * Set NEXT_PUBLIC_AD_VIEWABILITY_ENDPOINT to your analytics endpoint.
- * Payload: { slotId, viewable: boolean, timestamp, userAgent }
- */
-export const AD_VIEWABILITY_ENDPOINT = process.env.NEXT_PUBLIC_AD_VIEWABILITY_ENDPOINT ?? '';
+/** Optional analytics sink for viewability: { slotId, viewable, timestamp }. */
+export const AD_VIEWABILITY_ENDPOINT = envOr('NEXT_PUBLIC_AD_VIEWABILITY_ENDPOINT', '');
 
-/** Fallback ad network configuration.
- * 
- * If Adsterra blocks domain, swap to backup network via env var.
- * Format: 'adsterra' | 'propellerads' | 'hilltopads' | 'none'
- */
-export const FALLBACK_AD_NETWORK = (process.env.NEXT_PUBLIC_FALLBACK_AD_NETWORK as 'adsterra' | 'propellerads' | 'hilltopads' | 'none') ?? 'none';
+/** Fallback network if the primary is banned: adsterra|propellerads|hilltopads|none */
+export const FALLBACK_AD_NETWORK = (
+  ['adsterra', 'propellerads', 'hilltopads', 'none'] as const
+).includes(process.env.NEXT_PUBLIC_FALLBACK_AD_NETWORK as 'adsterra')
+  ? (process.env.NEXT_PUBLIC_FALLBACK_AD_NETWORK as
+      | 'adsterra'
+      | 'propellerads'
+      | 'hilltopads'
+      | 'none')
+  : 'none';
 
-/** PropellerAds backup zone IDs (set if using fallback) */
+/** PropellerAds backup zone IDs (set only if using the fallback). */
 export const PROPELLERADS_ZONES = {
-  popunder: process.env.NEXT_PUBLIC_PROPELLERADS_POPUNDER_ZONE ?? '',
-  directLink: process.env.NEXT_PUBLIC_PROPELLERADS_DIRECT_LINK_ZONE ?? '',
-  interstitial: process.env.NEXT_PUBLIC_PROPELLERADS_INTERSTITIAL_ZONE ?? '',
+  popunder: envOr('NEXT_PUBLIC_PROPELLERADS_POPUNDER_ZONE', ''),
+  directLink: envOr('NEXT_PUBLIC_PROPELLERADS_DIRECT_LINK_ZONE', ''),
+  interstitial: envOr('NEXT_PUBLIC_PROPELLERADS_INTERSTITIAL_ZONE', ''),
 } as const;
 
-/** HilltopAds backup zone IDs (set if using fallback) */
+/** HilltopAds backup zone IDs (set only if using the fallback). */
 export const HILLTOPADS_ZONES = {
-  popunder: process.env.NEXT_PUBLIC_HILLTOPADS_POPUNDER_ZONE ?? '',
-  directLink: process.env.NEXT_PUBLIC_HILLTOPADS_DIRECT_LINK_ZONE ?? '',
-  banner: process.env.NEXT_PUBLIC_HILLTOPADS_BANNER_ZONE ?? '',
+  popunder: envOr('NEXT_PUBLIC_HILLTOPADS_POPUNDER_ZONE', ''),
+  directLink: envOr('NEXT_PUBLIC_HILLTOPADS_DIRECT_LINK_ZONE', ''),
+  banner: envOr('NEXT_PUBLIC_HILLTOPADS_BANNER_ZONE', ''),
 } as const;

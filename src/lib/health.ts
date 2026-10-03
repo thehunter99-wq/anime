@@ -1,4 +1,12 @@
 
+import {
+  ADSTERRA_KEY,
+  NATIVE_BANNER_ZONE_URL,
+  POPUNDER_ZONE_URL,
+  SMARTLINK_URL,
+  SOCIAL_BAR_ZONE_URL,
+} from '@/config/ads';
+
 export type CheckStatus = 'ok' | 'warn' | 'error' | 'pending';
 
 export interface CheckResult {
@@ -34,21 +42,15 @@ export function getTMDBKey() {
 }
 
 export function getAdsterraKey() {
-  return process.env.NEXT_PUBLIC_ADSTERRA_KEY ?? '';
+  return ADSTERRA_KEY;
 }
 
 export function getAdsterraSocialBarUrl() {
-  return (
-    process.env.NEXT_PUBLIC_ADSTERRA_SOCIAL_BAR_URL ??
-    'https://pl31625876.profitableratecpmnetwork.com/77/43/d2/7743d209f9e5ab47329ac706ebe9fa56.js'
-  );
+  return SOCIAL_BAR_ZONE_URL;
 }
 
 export function getAdsterraPopunderUrl() {
-  return (
-    process.env.NEXT_PUBLIC_ADSTERRA_POPUNDER_URL ??
-    'https://pl31625875.profitableratecpmnetwork.com/be/f0/3c/bef03cbd6a8d7712fde3e921125ecc00.js'
-  );
+  return POPUNDER_ZONE_URL;
 }
 
 /**
@@ -215,17 +217,11 @@ export function checkAdsterra(): CheckResult {
 }
 
 export function getAdsterraSmartlinkUrl() {
-  return (
-    process.env.NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL ??
-    'https://www.profitableratecpmnetwork.com/tguhgg4ee?key=b0ad7e27ed01791677110762cfb5d058'
-  );
+  return SMARTLINK_URL;
 }
 
 export function getAdsterraNativeBannerUrl() {
-  return (
-    process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_BANNER_URL ??
-    'https://pl31625878.profitableratecpmnetwork.com/89898e7af070f78c4da937a6a83f13c7/invoke.js'
-  );
+  return NATIVE_BANNER_ZONE_URL;
 }
 
 async function checkAdsterraScript(

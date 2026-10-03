@@ -232,22 +232,3 @@
     @apply absolute top-2 right-2 z-10 text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-white/80 backdrop-blur px-2 py-0.5 rounded;
   }
 }
-
-/* Social Bar - force to bottom, never top */
-@layer components {
-  .adsterra-social-bar,
-  [id*="adsterra-social"],
-  [id*="container-"],
-  div[style*="position: fixed"],
-  div[style*="position:fixed"] {
-    top: auto !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    transform: none !important;
-    border-radius: 0 !important;
-    position: fixed !important;
-  }
-}
