@@ -57,11 +57,16 @@ function envOr(name: string, fallback: string): string {
 const SITE_URL = envOr('NEXT_PUBLIC_SITE_URL', 'https://movanime.site').replace(/\/$/, '');
 
 /* ─────────────────────── Live zone defaults ───────────────────────
- * These are the operator's real, responding zones (verified: the social bar
- * script returns HTTP 200 with a 69KB payload). Keep in sync with .env.example.
+ * These are the operator's real, responding zones. Keep in sync with .env.example.
+ *
+ * The popunder hash is 32 characters and ENDS IN `cc00`. An earlier revision had
+ * a 31-character copy that ended in `cc0`, from a transcription slip. Both URLs
+ * return HTTP 200, so the typo was invisible — but they serve different scripts
+ * (76652 vs 90567 bytes) and only the 32-character payload embeds the zone hash.
+ * The short one loads and does nothing. Check the length when changing a zone.
  */
 const ZONE_POPUNDER =
-  'https://pl31625875.profitableratecpmnetwork.com/be/f0/3c/bef03cbd6a8d7712fde3e921125ecc0.js';
+  'https://pl31625875.profitableratecpmnetwork.com/be/f0/3c/bef03cbd6a8d7712fde3e921125ecc00.js';
 const ZONE_SOCIAL_BAR =
   'https://pl31625876.profitableratecpmnetwork.com/77/43/d2/7743d209f9e5ab47329ac706ebe9fa56.js';
 const ZONE_NATIVE_BANNER =
@@ -245,10 +250,40 @@ export const DIRECT_LINK_URL = envOr('NEXT_PUBLIC_ADSTERRA_DIRECT_LINK_URL', '')
  * LCP and the first meaningful interaction clear, and Adsterra's own allowance
  * (about one popunder per 30 min) is enforced separately by POPUNDER_CAP.
  */
-export const AD_DELAYS = {
-  socialBar: 2500,
-  popunder: 12000,
-} as const;
+/**
+ * Load delays, in ms after hydration.
+ *
+ * These are MINIMUM DWELL times, not "resolve on idle" hints — `global-ads.tsx`
+ * enforces them as a hard floor so a fast idle callback or an early mousemove
+ * cannot pull an ad script in during the first paint. Loading ad scripts before
+ * LCP inflates bounce, and bounced impressions are the fastest route to a
+ * domain being judged low-quality.
+ *
+ * Tuned down from 30s / 3.5s. The popunder sat at 30s PLUS an engagement
+ * requirement, which in practice meant it almost never armed inside a normal
+ * visit — it looked permanently broken rather than cautious. 12s still leaves
+ * LCP and the first meaningful interaction clear, and Adsterra's own allowance
+ * (about one popunder per 30 min) is enforced separately by POPUNDER_CAP.
+ *
+ * ── Verifying that an ad actually fires ───────────────────────────────────────
+ * A dwell gate plus a storage-based cap makes these units impossible to
+ * confirm by reloading: the cap remembers the last fire, and the dwell is
+ * invisible while you wait. Set NEXT_PUBLIC_ADSTERRA_FAST_DEBUG=1 to collapse
+ * the dwell to 1.5s and ignore both caps.
+ *
+ * It is refused unless NODE_ENV is not production, so it cannot accidentally
+ * weaken the live site's guardrails — a real deployment would keep the delays
+ * and the caps even if the variable were set.
+ */
+const FAST_DEBUG =
+  process.env.NODE_ENV !== 'production' &&
+  envOr('NEXT_PUBLIC_ADSTERRA_FAST_DEBUG', '') === '1';
+
+export const AD_DEBUG_MODE = FAST_DEBUG;
+
+export const AD_DELAYS = FAST_DEBUG
+  ? ({ socialBar: 1500, popunder: 1500 } as const)
+  : ({ socialBar: 2500, popunder: 12000 } as const);
 
 /** Minimum delay before any ad script may load. */
 export const MIN_AD_DELAY = 3500;

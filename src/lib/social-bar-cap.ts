@@ -1,4 +1,4 @@
-import { SOCIAL_BAR_CAP } from '@/config/ads';
+import { AD_DEBUG_MODE, SOCIAL_BAR_CAP } from '@/config/ads';
 
 /**
  * Rolling-window trigger counter for the social bar.
@@ -35,6 +35,8 @@ function activeTriggers(now: number): number[] {
 /** True when the social bar has already fired its budget and must stay hidden. */
 export function isSocialBarCapped(now = Date.now()): boolean {
   if (typeof window === 'undefined') return false;
+  // See the note in isPopunderCapped: debug mode is non-production only.
+  if (AD_DEBUG_MODE) return false;
   return activeTriggers(now).length >= SOCIAL_BAR_CAP.maxTriggers;
 }
 

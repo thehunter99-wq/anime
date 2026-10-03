@@ -1,4 +1,4 @@
-import { POPUNDER_CAP } from '@/config/ads';
+import { AD_DEBUG_MODE, POPUNDER_CAP } from '@/config/ads';
 
 /**
  * Rolling-window trigger counter for the popunder.
@@ -47,6 +47,10 @@ function activeTriggers(now: number): number[] {
 /** True when the popunder has already fired its budget and must stay hidden. */
 export function isPopunderCapped(now = Date.now()): boolean {
   if (typeof window === 'undefined') return false;
+  // Debug mode bypasses the cap so a reload actually shows the unit. This is
+  // reachable only when NODE_ENV !== 'production', so the live site is unaffected.
+  if (AD_DEBUG_MODE) return false;
+
   const triggers = activeTriggers(now);
 
   // Ceiling: the session has already fired its whole budget.
