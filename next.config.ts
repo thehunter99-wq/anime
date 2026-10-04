@@ -2,6 +2,24 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   images: {
+    /**
+     * `unoptimized: true` — serve provider images directly.
+     *
+     * Vercel's Image Optimization is a metered service, and the free tier is
+     * capped per month. Once exhausted it returns **HTTP 402 Payment Required**
+     * for every `/_next/image?url=…` request, so every poster on the site breaks
+     * at once. Verified against production: `/_next/image?url=…s4.anilist.co…`
+     * returns 402, while the upstream URLs themselves return 200.
+     *
+     * Posters therefore load straight from `image.tmdb.org` / `s4.anilist.co`,
+     * which costs nothing, cannot be exhausted, and cannot 402. The trade-offs
+     * are real and accepted here: no automatic format negotiation to AVIF/WebP,
+     * and resizing handled by the provider's own URL params.
+     *
+     * If the Vercel plan is upgraded or the quota is raised, this can be removed
+     * along with `formats`.
+     */
+    unoptimized: true,
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 31536000,
     remotePatterns: [
@@ -11,8 +29,6 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'images.unsplash.com', port: '', pathname: '/**' },
       { protocol: 'https', hostname: 'picsum.photos', port: '', pathname: '/**' },
     ],
-    // Performance: enable lazy loading by default
-    loader: 'default',
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },

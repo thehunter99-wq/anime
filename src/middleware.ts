@@ -152,6 +152,11 @@ const AD_HOSTS = [
 const AD_DELIVERY_HOSTS = [
   'https://consumeririssalary.com',
   'https://*.consumeririssalary.com',
+  // Confirmed in the live popunder and social-bar payloads after the first
+  // rotation; listed explicitly so it works immediately rather than waiting on
+  // an `*.adsterra.com` fetch.
+  'https://kettledroopingcontinuation.com',
+  'https://*.kettledroopingcontinuation.com',
   'https://*.highperformanceformat.com',
   'https://*.highcpmgate.com',
 ] as const;
@@ -193,14 +198,38 @@ function buildCSP(request: NextRequest): string {
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' ${AD_SCRIPT_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     // data: is required — Adsterra creatives are frequently inline base64 SVG.
-    `img-src 'self' data: blob: https://image.tmdb.org https://s4.anilist.co https://placehold.co https://images.unsplash.com https://picsum.photos ${AD_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
+    //
+    // `https:` is present because Adsterra rotates the host that serves creative
+    // images and impression pixels: consumeririssalary.com became
+    // kettledroopingcontinuation.com within hours, both confirmed referenced by
+    // the live zone payloads and both resolving into the same netblocks. A static
+    // allowlist therefore breaks every rotation. Ad images are inert data, so the
+    // exposure from a broad `img-src` is far smaller than for `connect-src`.
+    `img-src 'self' data: blob: https: ${AD_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
     "font-src 'self' data: https://fonts.gstatic.com",
     // Ad units beacon back to their own network after rendering; without these
     // the impression is never recorded. AD_DELIVERY_HOSTS is what makes the
     // creative fetch and the pixel beacon succeed — see its comment.
+    //
+    // ── Why this one is NOT given a bare `https:` ──────────────────────────────
+    // `connect-src` governs fetch/XHR/beacon destinations, so allowing every
+    // HTTPS origin would hand any injected script an unrestricted exfiltration
+    // channel — the one directive where a blanket wildcard costs real security.
+    //
+    // The rotation problem is instead solved at the source: the zone payload
+    // fetches its delivery host from Adsterra's API, and `*.adsterra.com` is
+    // already allowlisted, so a rotated host resolves on first contact and its
+    // follow-up requests are permitted. When a brand-new apex is issued that is
+    // not covered by that wildcard, add it to AD_DELIVERY_HOSTS — that list is
+    // the intended maintenance point, and it keeps script-src and connect-src
+    // narrow.
+    //
+    // `http:` is deliberately NOT allowed, so plaintext requests stay blocked.
     `connect-src 'self' ${AD_SCRIPT_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com https://*.google-analytics.com`,
     // Ad units render their creative inside an iframe on the network's domain.
-    `frame-src 'self' ${AD_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://vidsrc.pm https://vidlink.pro https://www.2embed.cc https://vidsrc.sbs https://autoembed.co`,
+    // Framed creatives can be served from a rotated delivery host, so `https:`
+    // is allowed here — a frame is inert data and cannot exfiltrate by itself.
+    `frame-src 'self' ${AD_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https: https://vidsrc.pm https://vidlink.pro https://www.2embed.cc https://vidsrc.sbs https://autoembed.co`,
     "object-src 'none'",
     "base-uri 'self'",
     // Some Adsterra units post a form to their lander. 'self' alone blocked them.
