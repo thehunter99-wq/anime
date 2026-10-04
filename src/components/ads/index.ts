@@ -8,7 +8,6 @@
 export { AdSlot, type AdSlotProps, InContentLoader } from './ad-slot';
 export { NativeBannerAd } from './native-banner';
 export { BannerSlots } from './banner-slots';
-export { AdsterraPopunder, AdsterraSocialBar } from './global-ads';
 export { AdFrame, AdSkeleton, useAdFilled } from './primitives';
 
 /**

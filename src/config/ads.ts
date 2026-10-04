@@ -5,12 +5,12 @@
  * rotating a zone key or a Smartlink destination never requires a code change.
  * Keep the defaults in sync with `.env.example`.
  *
- * ── WHY DEFAULTS ARE REAL ZONE URLS, NOT EMPTY STRINGS ───────────────────────
+ * ── WHY DEFAULTS ARE REAL ZONE URLS, NOT EMPTY STRINGS ───────────────────
  * An earlier version read every URL with `process.env.X ?? ''`. That silently
  * produced two hard failures:
  *
  *   1. An env var set to an EMPTY STRING (very common — a Netlify/Vercel env
- *      field left blank, or a `NEXT_PUBLIC_SITE_URL=` line in .env.local) is not
+ *      field left blank, or a `NEXT_PUBLIC_SITE_URL=` line in .env.local) is
  *      null/undefined, so `??` never falls back. SITE_URL became '' and every
  *      proxied zone URL collapsed to a bare relative path.
  *   2. `NATIVE_BANNER_CONTAINER_ID` is derived by parsing the zone URL. A
@@ -23,20 +23,13 @@
  * or blank env var degrades to "still working" instead of "silently dead".
  * `envOr()` below is what makes blank values fall back correctly.
  *
- * ── AdBlocker Bypass ─────────────────────────────────────────────────────────
+ * ── AdBlocker Bypass ─────────────────────────────────────────────────
  * Adsterra scripts are proxied through internal Next.js rewrites (next.config.ts)
  * so AdBlockers cannot block them by domain name:
  *   /assets/js/p-unit.js    -> Popunder
  *   /assets/js/s-unit.js    -> Social Bar
  *   /assets/js/n-unit.js    -> Native Banner
  *   /assets/js/in-content.js -> In-content loader (ssat.pro)
- *
- * ── Anti-Ban Configuration ───────────────────────────────────────────────────
- * Adsterra bans domains for: >3-5 popunders per session, a social bar covering
- * player controls, forced navigation, Popunder + Direct Link together, and ads
- * on thin pages. The caps below stay well inside those limits on purpose —
- * a banned domain earns zero, so the caps are the revenue-maximising choice,
- * not a conservative one.
  */
 
 /**
@@ -93,7 +86,7 @@ export const IN_CONTENT_ENABLED = ADSTERRA_KEY.length > 0;
 /**
  * Zone scripts, loaded DIRECTLY from the network's own domain.
  *
- * ── Why the first-party proxy was removed ────────────────────────────────────
+ * ── Why the first-party proxy was removed ────────────────────────────
  * An earlier version rewrote `/assets/js/p-unit.js` (etc.) through next.config
  * so a domain-name AdBlocker could not filter them. That backfired in
  * production: there is no `public/assets/js/` directory, so those paths are not
@@ -137,7 +130,7 @@ export const NATIVE_BANNER_URL = NATIVE_BANNER_ZONE_URL;
 /**
  * In-content zone loader.
  *
- * ── WHY THIS IS NOT ssat.pro ────────────────────────────────────────────────
+ * ── WHY THIS IS NOT ssat.pro ────────────────────────────────────────
  * The Adsterra "Banner (in-content)" integration is usually documented as
  * `https://ssat.pro/cdn/client.js?key=<zone>`. That host has NO DNS RECORD —
  * `Resolve-DnsName ssat.pro` fails — so every in-content slot sat waiting on a
@@ -233,83 +226,18 @@ export const SMARTLINK_URL = envOr('NEXT_PUBLIC_ADSTERRA_SMARTLINK_URL', ZONE_SM
 export const DIRECT_LINK_URL = envOr('NEXT_PUBLIC_ADSTERRA_DIRECT_LINK_URL', '');
 
 /**
- * Load delays, in ms after hydration.
- *
- * These are MINIMUM DWELL times, not "resolve on idle" hints — `ads.tsx`
- * enforces them as a hard floor so a fast idle callback or an early mousemove
- * cannot pull an ad script in during the first paint. Loading ad scripts before
- * LCP inflates bounce, and bounced impressions are the fastest route to a
- * domain being judged low-quality.
+ * Direct Link guardrail: 3 triggers per 10 minutes (~43/day/user worst case).
+ * Networks ban at roughly 5-10 per session, so this stays well under.
  */
-/**
- * Load delays, in ms after hydration.
- *
- * These are MINIMUM DWELL times, not "resolve on idle" hints — `global-ads.tsx`
- * enforces them as a hard floor so a fast idle callback or an early mousemove
- * cannot pull an ad script in during the first paint. Loading ad scripts before
- * LCP inflates bounce, and bounced impressions are the fastest route to a
- * domain being judged low-quality.
- *
- * Tuned down from 30s / 3.5s. The popunder sat at 30s PLUS an engagement
- * requirement, which in practice meant it almost never armed inside a normal
- * visit — it looked permanently broken rather than cautious. 12s still leaves
- * LCP and the first meaningful interaction clear, and Adsterra's own allowance
- * (about one popunder per 30 min) is enforced separately by POPUNDER_CAP.
- */
-/**
- * Load delays, in ms after hydration.
- *
- * These are MINIMUM DWELL times, not "resolve on idle" hints — `global-ads.tsx`
- * enforces them as a hard floor so a fast idle callback or an early mousemove
- * cannot pull an ad script in during the first paint. Loading ad scripts before
- * LCP inflates bounce, and bounced impressions are the fastest route to a
- * domain being judged low-quality.
- *
- * Tuned down from 30s / 3.5s. The popunder sat at 30s PLUS an engagement
- * requirement, which in practice meant it almost never armed inside a normal
- * visit — it looked permanently broken rather than cautious. 12s still leaves
- * LCP and the first meaningful interaction clear, and Adsterra's own allowance
- * (about one popunder per 30 min) is enforced separately by POPUNDER_CAP.
- *
- * ── Verifying that an ad actually fires ───────────────────────────────────────
- * A dwell gate plus a storage-based cap makes these units impossible to
- * confirm by reloading: the cap remembers the last fire, and the dwell is
- * invisible while you wait. Set NEXT_PUBLIC_ADSTERRA_FAST_DEBUG=1 to collapse
- * the dwell to 1.5s and ignore both caps.
- *
- * It is refused unless NODE_ENV is not production, so it cannot accidentally
- * weaken the live site's guardrails — a real deployment would keep the delays
- * and the caps even if the variable were set.
- */
-const FAST_DEBUG =
-  process.env.NODE_ENV !== 'production' &&
-  envOr('NEXT_PUBLIC_ADSTERRA_FAST_DEBUG', '') === '1';
-
-export const AD_DEBUG_MODE = FAST_DEBUG;
-
-export const AD_DELAYS = FAST_DEBUG
-  ? ({ socialBar: 1500, popunder: 1500 } as const)
-  : ({ socialBar: 2500, popunder: 12000 } as const);
-
-/** Minimum delay before any ad script may load. */
-export const MIN_AD_DELAY = 3500;
-
-/** User interaction events that count as engagement for the dwell gate. */
-export const INTERACTION_EVENTS = ['scroll', 'mousemove', 'touchstart', 'keydown', 'click'] as const;
+export const DIRECT_LINK_CAP = {
+  maxTriggers: 3,
+  windowMs: 10 * 60 * 1000,
+  storageKey: 'cineverse:directlink:v1',
+} as const;
 
 /**
  * Reserved heights, declared before the network responds so a slow or blocked ad
  * cannot shift the page (CLS).
- *
- * RESPONSIVE BY DESIGN. The in-content slot was a flat `min-h-[250px]`, which is
- * correct for a 300px-wide desktop ad but is a full-width grey block on a phone —
- * and with four placements that pushed most of a mobile page below the fold
- * before any content was reached. The smaller mobile floor still prevents CLS;
- * the slot simply has room to grow once the creative arrives, because `min-h-*`
- * is a floor and never a cap.
- *
- * The native banner is 90px on all sizes because that is the height the zone
- * itself renders at.
  */
 export const AD_RESERVED_HEIGHT = {
   inContent: 'min-h-[140px] sm:min-h-[250px]',
@@ -337,84 +265,3 @@ export const BANNER_SLOTS = [
 ] as const satisfies readonly { id: string; label: string; format: string }[];
 
 export type BannerSlotId = (typeof BANNER_SLOTS)[number]['id'];
-
-/**
- * Direct Link guardrail: 3 triggers per 10 minutes (~43/day/user worst case).
- * Networks ban at roughly 5-10 per session, so this stays well under.
- */
-export const DIRECT_LINK_CAP = {
-  maxTriggers: 3,
-  windowMs: 10 * 60 * 1000,
-  storageKey: 'cineverse:directlink:v1',
-} as const;
-
-/**
- * Popunder guardrail.
- *
- * ── Two budgets, both enforced ────────────────────────────────────────────────
- * Adsterra's own allowance is about ONE popunder per 30 min per IP, and the ban
- * threshold quoted in their guidance is "more than 3-5 popunders per session".
- * The original config fired once per 30 min and then went silent for the rest of
- * the window, which left most of a normal visit unmonetised.
- *
- * This keeps the 30-minute spacing (so a single user is never popped twice in
- * quick succession, which is what the network actually watches) but allows the
- * budget to REFILL within a long session, up to a hard per-tab ceiling:
- *
- *   - minGapMs    30 min between fires -> matches Adsterra's own cadence
- *   - maxTriggers 4 per session        -> sits just under the 5-per-session ban line
- *
- * A user who stays on the site for two hours now earns 3-4 popunder impressions
- * instead of 1, while a casual visitor still sees exactly one - the behaviour
- * that was already safe. Raising this past 4 is NOT recommended: the ban line is
- * a per-session count, and a banned domain earns zero.
- */
-export const POPUNDER_CAP = {
-  maxTriggers: 4,
-  windowMs: 30 * 60 * 1000,
-  /** Spacing floor between two fires, in ms. */
-  minGapMs: 30 * 60 * 1000,
-  storageKey: 'cineverse:popunder:v2',
-} as const;
-
-/**
- * Social Bar guardrail: 1 per 24 hours via localStorage.
- *
- * A sticky unit is the highest-annoyance format on the site, so it is still
- * rationed hard — but it is now allowed on EVERY route (see ad-underlays.tsx),
- * so the one impression it gets lands on the first page a visitor actually
- * sees rather than being spent on a route that happened to be excluded.
- */
-export const SOCIAL_BAR_CAP = {
-  maxTriggers: 1,
-  windowMs: 24 * 60 * 60 * 1000,
-  storageKey: 'cineverse:socialbar:v1',
-} as const;
-
-/** Optional analytics sink for viewability: { slotId, viewable, timestamp }. */
-export const AD_VIEWABILITY_ENDPOINT = envOr('NEXT_PUBLIC_AD_VIEWABILITY_ENDPOINT', '');
-
-/** Fallback network if the primary is banned: adsterra|propellerads|hilltopads|none */
-export const FALLBACK_AD_NETWORK = (
-  ['adsterra', 'propellerads', 'hilltopads', 'none'] as const
-).includes(process.env.NEXT_PUBLIC_FALLBACK_AD_NETWORK as 'adsterra')
-  ? (process.env.NEXT_PUBLIC_FALLBACK_AD_NETWORK as
-      | 'adsterra'
-      | 'propellerads'
-      | 'hilltopads'
-      | 'none')
-  : 'none';
-
-/** PropellerAds backup zone IDs (set only if using the fallback). */
-export const PROPELLERADS_ZONES = {
-  popunder: envOr('NEXT_PUBLIC_PROPELLERADS_POPUNDER_ZONE', ''),
-  directLink: envOr('NEXT_PUBLIC_PROPELLERADS_DIRECT_LINK_ZONE', ''),
-  interstitial: envOr('NEXT_PUBLIC_PROPELLERADS_INTERSTITIAL_ZONE', ''),
-} as const;
-
-/** HilltopAds backup zone IDs (set only if using the fallback). */
-export const HILLTOPADS_ZONES = {
-  popunder: envOr('NEXT_PUBLIC_HILLTOPADS_POPUNDER_ZONE', ''),
-  directLink: envOr('NEXT_PUBLIC_HILLTOPADS_DIRECT_LINK_ZONE', ''),
-  banner: envOr('NEXT_PUBLIC_HILLTOPADS_BANNER_ZONE', ''),
-} as const;

@@ -9,12 +9,16 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
 import { BannerSlots, InContentLoader, NativeBannerAd } from "@/components/ads";
-import AdUnderlays from "@/components/ad-underlays";
 import SmartlinkCta from "@/components/smartlink-cta";
 import AdConfigDiagnostic from "@/components/ad-config-diagnostic";
 import { AdBlockDetector } from "@/components/adblock-detector";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { PreconnectOrigins, PrefetchLinks } from "@/components/prefetch-links";
+import Script from "next/script";
+import {
+  SOCIAL_BAR_URL,
+  POPUNDER_URL,
+} from "@/config/ads";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -350,10 +354,10 @@ export default async function RootLayout({
         <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
         {/* Underlays load afterInteractive so they never block first paint, and
             are chosen per route so the player stays usable. */}
-        <AdUnderlays />
-        {/* Dev-only report of which ad env vars are unset. Renders null. */}
+        {/* Direct ad script tags — no wrapper components, no guardrails */}
+        <Script strategy="afterInteractive" src={SOCIAL_BAR_URL} async />
+        <Script strategy="afterInteractive" src={POPUNDER_URL} async />
         <AdConfigDiagnostic />
-        {/* AdBlock detector - shows subtle overlay if extreme AdBlocker blocks ads */}
         <AdBlockDetector />
         {/* Service Worker for offline support and caching */}
         <ServiceWorkerRegistration />
