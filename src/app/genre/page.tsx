@@ -6,7 +6,6 @@ import { GENRES } from '@/lib/genres';
 import Header from '@/components/header';
 import GenreNav from '@/components/genre-nav';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner } from '@/components/ads';
 import SmartlinkCta from '@/components/smartlink-cta';
 
 export const metadata: Metadata = {
@@ -84,7 +83,6 @@ export default function GenresIndexPage() {
 
           <GenreNav />
 
-          <AdBanner />
 
           <SmartlinkCta label="Fast HD Download — Any Genre" hint="Sponsored offer" />
 

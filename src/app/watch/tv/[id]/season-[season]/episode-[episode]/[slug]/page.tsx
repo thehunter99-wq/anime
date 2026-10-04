@@ -25,7 +25,6 @@ import RecommendedTv from '@/components/recommended-tv';
 import TrendingInGenreTv from '@/components/trending-in-genre-tv';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AdSlot } from '@/components/ads';
 
 type Props = {
   params: Promise<{
@@ -235,7 +234,6 @@ export default async function WatchTvEpisodePage({ params }: Props) {
               </a>
             </Button>
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

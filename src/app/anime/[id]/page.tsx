@@ -1,4 +1,4 @@
-﻿import { notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 
@@ -20,7 +20,6 @@ import MediaCarousel from '@/components/media-carousel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
-import { AdSlot } from '@/components/ads';
 import { pingIndexNowForContent } from '@/lib/indexnow';
 import { getEnhancedTrendingByGenre } from '@/components/anime-seo-anchors';
 
@@ -249,7 +248,6 @@ export default async function AnimePage({ params }: Props) {
               </p>
             )}
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

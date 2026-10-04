@@ -20,7 +20,6 @@ import TrendingInGenre from '@/components/trending-in-genre';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
-import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 import SmartlinkCta from '@/components/smartlink-cta';
 import { getDownloadUrl } from '@/lib/embed';
@@ -250,7 +249,6 @@ export default async function MoviePage({ params }: Props) {
 
             {/* Reserved height is declared on the slot, so a blocked ad script
                 cannot shift the recommended rail below it. */}
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

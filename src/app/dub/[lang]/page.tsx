@@ -11,7 +11,6 @@ import MovieGrid from '@/components/movie-grid';
 import TvGrid from '@/components/tv-grid';
 import Pagination from '@/components/pagination';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner } from '@/components/ads';
 import SmartlinkCta from '@/components/smartlink-cta';
 
 type Props = {
@@ -191,7 +190,6 @@ export default async function DubLanguagePage({ params, searchParams }: Props) {
 {movies.length > 0 && (
                  <MovieGrid title={`${language.label} Movies`} items={movies} />
                )}
-                               <AdBanner />
                               {/* Smartlink CTA between the movies and series rails, for visitors
                                   who browse the dubbed hub without opening a title page. */}
                               <SmartlinkCta label={`Fast HD Download — ${language.label} Dubbed`} hint="Sponsored offer" />

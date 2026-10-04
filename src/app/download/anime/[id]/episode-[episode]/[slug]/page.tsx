@@ -20,7 +20,6 @@ import MediaCarousel from '@/components/media-carousel';
 import { getEnhancedTrendingByGenre } from '@/components/anime-seo-anchors';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 
 type Props = {
@@ -219,7 +218,6 @@ export default async function DownloadAnimeEpisodePage({ params }: Props) {
               </p>
             )}
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

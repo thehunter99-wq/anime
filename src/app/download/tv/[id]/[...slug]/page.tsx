@@ -16,7 +16,6 @@ import TrendingInGenreTv from '@/components/trending-in-genre-tv';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle, Download } from 'lucide-react';
-import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 import { getDownloadUrl } from '@/lib/embed';
 import Image from 'next/image';
@@ -290,7 +289,6 @@ export default async function DownloadTvLongTailPage({ params }: Props) {
               isManga={false}
             />
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

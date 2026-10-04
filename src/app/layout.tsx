@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
-import { BannerSlots, NativeBannerAd } from "@/components/ads";
+import { AdSlot, NativeBannerAd } from "@/components/ads";
 import SmartlinkCta from "@/components/smartlink-cta";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { PreconnectOrigins, PrefetchLinks } from "@/components/prefetch-links";
@@ -314,43 +314,33 @@ export default async function RootLayout({
       >
         <DisclaimerModal />
 
-        {/* Top of every page, above the page's own content. */}
+{/* Top of every page, above the page's own content. This is the ONE
+            in-content slot: the zone fills the first `container-<key>` element
+            it finds, so a second one on the same page can never fill. */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-          <BannerSlots positions={['header']} />
+          <AdSlot label="Advertisement" />
         </div>
         <div className="flex-grow">{children}</div>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          {/* NativeBannerAd is a singleton — it lives here and only here, because
-              the loader binds to the first element matching its container id.
-              Every repeatable position uses BannerSlots/AdSlot instead. Both
-              declare their own reserved height so a blocked script cannot
-              cause CLS.
-
-              Being in the root layout is exactly what places it on EVERY page —
-              there is no per-route wiring to forget. */}
+          {/* Native banner: an iframe, so the zone script never resolves a parent
+              inside React's tree. See components/ads/native-banner.tsx. */}
           <NativeBannerAd label="Advertisement" />
 
-          {/* Smartlink rail on every page. It sits above the footer slot so it is
-              reachable from the browse surface, not only from a detail page's
-              download button. Renders null when no smartlink URL is configured. */}
+          {/* Smartlink: a plain link, no script. */}
           <div className="py-4">
             <SmartlinkCta />
           </div>
-
-          <BannerSlots positions={['footer']} />
         </div>
         <Footer />
         <Toaster />
         <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
-        {/* Direct ad script tags — no wrapper components, no guardrails */}
+        {/* Social Bar and Popunder: mounted once, here in the root layout, so a
+            route change never unmounts the tag they resolved their parent from.
+            afterInteractive keeps them off the critical path. */}
         <Script strategy="afterInteractive" src={SOCIAL_BAR_URL} async />
         <Script strategy="afterInteractive" src={POPUNDER_URL} async />
         {IN_CONTENT_ZONE_URL ? (
-          <Script
-            strategy="afterInteractive"
-            src={IN_CONTENT_ZONE_URL}
-            async
-          />
+          <Script strategy="afterInteractive" src={IN_CONTENT_ZONE_URL} async />
         ) : null}
         {/* Service Worker for offline support and caching */}
         <ServiceWorkerRegistration />

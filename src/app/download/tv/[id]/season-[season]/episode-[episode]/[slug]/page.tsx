@@ -23,7 +23,6 @@ import { RatingBadge } from '@/components/rating-badge';
 import Header from '@/components/header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 import { getDownloadUrl } from '@/lib/embed';
 
@@ -233,7 +232,6 @@ export default async function DownloadTvEpisodePage({ params }: Props) {
 
             <DownloadButtons directUrl={downloadUrl} episodeLabel={`S${seasonNumber}E${episodeNumber}`} />
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
       </main>

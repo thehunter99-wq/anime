@@ -6,7 +6,6 @@ import { SITE_URL } from '@/lib/site';
 import Header from '@/components/header';
 import MovieCarousel from '@/components/movie-carousel';
 import MovieGrid from '@/components/movie-grid';
-import { AdBanner } from '@/components/ads';
 import SmartlinkCta from '@/components/smartlink-cta';
 
 /**
@@ -58,10 +57,8 @@ export default async function MoviesPage() {
           ) : (
             <>
               {popular.length > 0 && <MovieGrid title="Popular Movies" items={popular} />}
-              <AdBanner />
               {trending.length > 0 && <MovieCarousel title="Trending This Week" items={trending} />}
               {nowPlaying.length > 0 && <MovieGrid title="Now Playing" items={nowPlaying} />}
-              <AdBanner />
               {/* Smartlink entry point for visitors who browse but never open a
                   film's detail page — the only other place the smartlink appears. */}
               <SmartlinkCta label="Fast HD Download — Latest Movies" hint="Sponsored offer" />

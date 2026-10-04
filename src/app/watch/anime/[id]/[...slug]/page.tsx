@@ -19,7 +19,6 @@ import RecommendedMovies1080p from '@/components/recommended-movies-1080p';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle, Download } from 'lucide-react';
-import { AdSlot } from '@/components/ads';
 import Image from 'next/image';
 import { pingIndexNowForContent } from '@/lib/indexnow';
 
@@ -314,7 +313,6 @@ export default async function WatchAnimeLongTailPage({ params }: Props) {
               </p>
             )}
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

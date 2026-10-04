@@ -3,7 +3,6 @@ import Header from '@/components/header';
 import TvGrid from '@/components/tv-grid';
 import TvCarousel from '@/components/tv-carousel';
 import MovieCarousel from '@/components/movie-carousel';
-import { AdBanner } from '@/components/ads';
 
 export const revalidate = 3600;
 
@@ -61,13 +60,11 @@ export default async function IndianWebSeriesPage() {
           ) : (
             <>
               {rails[0] && <TvGrid title={rails[0].label} items={rails[0].items} />}
-              <AdBanner />
               {rails.slice(1).map((rail) => (
                 <TvCarousel key={rail.label} title={rail.label} items={rail.items} />
               ))}
               {hindiMovies.length > 0 && (
                 <>
-                  <AdBanner />
                   <MovieCarousel title="Hindi & Bollywood Movies" items={hindiMovies} />
                 </>
               )}

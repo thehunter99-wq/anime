@@ -7,7 +7,6 @@ import Header from '@/components/header';
 import MovieCarousel from '@/components/movie-carousel';
 import TvCarousel from '@/components/tv-carousel';
 import MediaCarousel from '@/components/media-carousel';
-import { AdBanner } from '@/components/ads';
 import SmartlinkCta from '@/components/smartlink-cta';
 
 /**
@@ -62,7 +61,6 @@ export default async function TrendingPage() {
               {trendingMovies.length > 0 && (
                 <MovieCarousel title="Trending Movies Today" items={trendingMovies} />
               )}
-              <AdBanner />
               <SmartlinkCta label="Fast HD Download — Trending Now" hint="Sponsored offer" />
               {trendingTv.length > 0 && (
                 <TvCarousel title="Trending Series Today" items={trendingTv} />

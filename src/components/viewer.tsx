@@ -16,7 +16,6 @@ import { cn, slugify } from '@/lib/utils';
 import { getEmbedSources, getDownloadUrl, hasDownload } from '@/lib/embed';
 import DownloadButtons from '@/components/download-buttons';
 import PlayerOverlay from '@/components/player-overlay';
-import { BannerSlots } from '@/components/ads';
 
 import { useToast } from '@/hooks/use-toast';
 import { saveProgress } from '@/lib/progress-store';
@@ -386,15 +385,10 @@ export default function Viewer({
         </div>
       </main>
 
-      {/* The `below-video` placement. Only the viewer knows where the player
-          ends, so it is hosted here rather than in the layout. Reserved height
-          is declared on the slot itself, so a blocked or slow ad cannot shift
-          the controls below it. */}
-      {!isManga && !unavailable && (
-        <div className="container mx-auto px-4 pb-3">
-          <BannerSlots positions={['below-video']} className="mx-auto max-w-3xl" />
-        </div>
-      )}
+      {/* No in-content slot here on purpose. The zone resolves a single
+          `container-<key>` element per document, so the one in the root layout
+          is the only one that can ever fill; a second would be an inert
+          duplicate id. */}
 
       {hasDownload(type) && downloadUrl && (
         <div className="container mx-auto px-4 pb-3">

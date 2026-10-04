@@ -20,7 +20,6 @@ import MediaCarousel from '@/components/media-carousel';
 import { getEnhancedTrendingByGenre } from '@/components/anime-seo-anchors';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AdSlot } from '@/components/ads';
 
 type Props = {
   params: Promise<{
@@ -212,7 +211,6 @@ export default async function WatchAnimeEpisodePage({ params }: Props) {
               </p>
             )}
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

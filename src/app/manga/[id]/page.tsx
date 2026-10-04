@@ -18,7 +18,6 @@ import { SeasonEpisodeSelector } from '@/components/season-episode-selector';
 import { Badge } from '@/components/ui/badge';
 import RelatedMedia from '@/components/related-media';
 import RecommendedMedia from '@/components/recommended-media';
-import { AdBanner } from '@/components/ads';
 import { pingIndexNowForContent } from '@/lib/indexnow';
 
 type Props = {
@@ -197,7 +196,6 @@ export default async function MangaPage({ params }: Props) {
               </div>
             </div>
 
-            <AdBanner />
 
             {media.relations && <RelatedMedia relations={media.relations} />}
             <RecommendedMedia media={media} />

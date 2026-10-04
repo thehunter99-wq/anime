@@ -17,7 +17,6 @@ import TvGrid from '@/components/tv-grid';
 import HeroCarousel from '@/components/hero-carousel';
 import MovieHeroCarousel from '@/components/movie-hero-carousel';
 import TvHeroCarousel from '@/components/tv-hero-carousel';
-import { AdBanner, AdSlot } from '@/components/ads';
 import SearchFilterTabs from '@/components/search-filter-tabs';
 import ContinueWatching from '@/components/continue-watching';
 
@@ -207,9 +206,6 @@ export default async function Home({
             {heroMangaItems.length > 0 && tab === 'manga' && <HeroCarousel items={heroMangaItems} />}
             {heroMovieItems.length > 0 && tab === 'movies' && <MovieHeroCarousel items={heroMovieItems} />}
             {heroTvItems.length > 0 && tab === 'tv' && <TvHeroCarousel items={heroTvItems} />}
-            <div className="container mx-auto px-4 pt-6 sm:px-6 lg:px-8">
-              <AdBanner />
-            </div>
             <div className="container mx-auto space-y-12 px-4 py-8 sm:px-6 lg:px-8">
               <ContinueWatching />
               {tab === 'anime' && (
@@ -220,7 +216,6 @@ export default async function Home({
                    {popularAnime.length > 0 && (
                      <MediaCarousel title="Popular Anime" items={popularAnime} />
                    )}
-                   <AdSlot className="mx-auto max-w-3xl" />
                    <div className="py-2" />
                    {trendingIndianMovies.length > 0 && (
                      <MovieCarousel title="Trending Indian Movies" items={trendingIndianMovies} />
@@ -248,7 +243,6 @@ export default async function Home({
  {indianHindiMovies.length > 0 && (
                       <MovieCarousel title="Hindi & Bollywood Movies" items={indianHindiMovies} />
                     )}
-                    <AdSlot className="mx-auto max-w-3xl" />
                     {indianSouthMovies.length > 0 && (
                      <MovieCarousel title="South Indian Movies" items={indianSouthMovies} />
                    )}

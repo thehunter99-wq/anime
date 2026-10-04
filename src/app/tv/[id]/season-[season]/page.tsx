@@ -23,7 +23,6 @@ import TrendingInGenreTv from '@/components/trending-in-genre-tv';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AdSlot } from '@/components/ads';
 
 type Props = {
   params: Promise<{ id: string; season: string }>;
@@ -336,7 +335,6 @@ export default async function TvSeasonPage({ params }: Props) {
               </Button>
             </div>
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

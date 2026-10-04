@@ -1,4 +1,4 @@
-﻿import { notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
@@ -22,7 +22,6 @@ import TrendingInGenreTv from '@/components/trending-in-genre-tv';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
-import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 import SmartlinkCta from '@/components/smartlink-cta';
 import { getDownloadUrl } from '@/lib/embed';
@@ -244,7 +243,6 @@ export default async function TvPage({ params }: Props) {
                 labelled variant for a visitor who does not act on the first. */}
             <SmartlinkCta label={`Fast HD Download — ${title}`} hint="Sponsored offer" className="mt-1" />
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 
@@ -271,7 +269,6 @@ export default async function TvPage({ params }: Props) {
                 </Link>
               ))}
             </nav>
-            <AdSlot className="mt-6" />
           </section>
         )}
 

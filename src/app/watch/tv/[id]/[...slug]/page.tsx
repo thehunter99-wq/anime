@@ -19,7 +19,6 @@ import RecommendedMovies1080p from '@/components/recommended-movies-1080p';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlayCircle, Download } from 'lucide-react';
-import { AdSlot } from '@/components/ads';
 import DownloadButtons from '@/components/download-buttons';
 import { getDownloadUrl } from '@/lib/embed';
 import Image from 'next/image';
@@ -320,7 +319,6 @@ export default async function WatchTvLongTailPage({ params }: Props) {
               </Button>
             </div>
 
-            <AdSlot className="mt-2" />
           </div>
         </div>
 

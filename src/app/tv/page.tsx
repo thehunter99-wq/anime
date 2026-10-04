@@ -3,7 +3,6 @@ import { type TVShow } from '@/lib/types';
 import Header from '@/components/header';
 import TvCarousel from '@/components/tv-carousel';
 import TvGrid from '@/components/tv-grid';
-import { AdBanner } from '@/components/ads';
 import SmartlinkCta from '@/components/smartlink-cta';
 
 export const revalidate = 3600;
@@ -43,10 +42,8 @@ export default async function WebSeriesPage() {
           ) : (
             <>
               {popular.length > 0 && <TvGrid title="Popular Web Series" items={popular} />}
-              <AdBanner />
               {trending.length > 0 && <TvCarousel title="Trending Today" items={trending} />}
               {topRated.length > 0 && <TvGrid title="Top Rated Series" items={topRated} />}
-              <AdBanner />
               {/* Smartlink entry point for visitors who browse but never open a
                   show's detail page — the only other place the smartlink appears. */}
               <SmartlinkCta label="Fast HD Download — Web Series" hint="Sponsored offer" />

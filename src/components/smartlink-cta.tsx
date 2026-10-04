@@ -1,64 +1,59 @@
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
+import { Zap } from 'lucide-react';
 
 import { SMARTLINK_URL } from '@/config/ads';
 import { cn } from '@/lib/utils';
 
+/**
+ * Smartlink — a plain link, never a script.
+ *
+ * A Smartlink / Direct Link is an ordinary destination URL. Adsterra records the
+ * impression when the URL is opened, so the only thing the integration has to
+ * do is be a real `<a href target="_blank">`. It used to be injected as a
+ * `<script src={SMARTLINK_URL}>`, which cannot work twice over: the response is
+ * an HTML landing page, not JavaScript, so the browser refuses to execute it,
+ * and the impression is only ever counted on a real navigation.
+ *
+ * No `useEffect`, no script element, no cleanup — nothing for a route change to
+ * break, and no possibility of a `parentNode` error.
+ *
+ * It is a Server Component: a static anchor needs no client JavaScript at all.
+ */
 export type SmartlinkCtaProps = {
-  /** Visible label (kept for backward compatibility — the script controls the UI). */
+  /** Visible label. */
   label?: string;
-  /** Small line under the label (kept for backward compatibility). */
+  /** Small line under the label. */
   hint?: string;
   className?: string;
 };
 
-export function SmartlinkCta({ className }: SmartlinkCtaProps) {
-  const [mounted, setMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scriptInjected = useRef(false);
-
+export function SmartlinkCta({
+  label = 'Fast HD Download',
+  hint,
+  className,
+}: SmartlinkCtaProps) {
   if (!SMARTLINK_URL) return null;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const container = containerRef.current;
-    if (!container) return;
-    if (scriptInjected.current) return;
-    if (document.getElementById('adsterra-smartlink-script')) return;
-
-    const script = document.createElement('script');
-    script.id = 'adsterra-smartlink-script';
-    script.src = SMARTLINK_URL;
-    script.async = true;
-    container.appendChild(script);
-    scriptInjected.current = true;
-
-    return () => {
-      scriptInjected.current = false;
-      const existing = document.getElementById('adsterra-smartlink-script');
-      if (existing && existing.parentNode === container) {
-        existing.remove();
-      }
-      container.innerHTML = '';
-    };
-  }, [mounted]);
-
-  if (!mounted) {
-    return <div className={cn('w-full min-h-[90px]', className ?? '')} data-ad-slot="smartlink" aria-label="Sponsored offer" />;
-  }
-
   return (
-    <div
-      ref={containerRef}
-      className={cn('w-full', className)}
+    <a
+      href={SMARTLINK_URL}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
       data-ad-slot="smartlink"
-      aria-label="Sponsored offer"
-    />
+      className={cn(
+        'block w-full rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-3',
+        'text-center font-semibold text-white shadow-lg shadow-red-500/25',
+        'transition hover:from-red-700 hover:to-red-800',
+        className
+      )}
+    >
+      <span className="inline-flex items-center gap-2">
+        <Zap className="h-4 w-4" aria-hidden="true" />
+        {label}
+      </span>
+      {hint ? (
+        <span className="mt-0.5 block text-xs font-normal text-white/80">{hint}</span>
+      ) : null}
+    </a>
   );
 }
 

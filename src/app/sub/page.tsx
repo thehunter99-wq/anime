@@ -11,7 +11,6 @@ import MediaGrid from '@/components/media-grid';
 import TvGrid from '@/components/tv-grid';
 import Pagination from '@/components/pagination';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner } from '@/components/ads';
 import SmartlinkCta from '@/components/smartlink-cta';
 
 type Props = {
@@ -171,7 +170,6 @@ export default async function SubbedPage({ searchParams }: Props) {
           ) : (
             <>
               {anime.length > 0 && <MediaGrid title="Subbed Anime" items={anime} />}
-              <AdBanner />
               {/* Smartlink CTA between the two rails. This page converts on
                   "watch subbed anime free", which is exactly the intent the
                   sponsored offer monetises, and neither rail links to a detail

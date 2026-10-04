@@ -13,7 +13,6 @@ import MediaGrid from '@/components/media-grid';
 import Pagination from '@/components/pagination';
 import GenreNav from '@/components/genre-nav';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner } from '@/components/ads';
 
 type Props = {
   params: Promise<{ year: string }>;
@@ -161,7 +160,6 @@ export default async function YearPage({ params, searchParams }: Props) {
           ) : (
             <>
               {movies.length > 0 && <MovieGrid title={`Movies from ${year}`} items={movies} />}
-              <AdBanner />
               {anime.length > 0 && <MediaGrid title={`Anime from ${year}`} items={anime} />}
               {tv.length > 0 && <TvGrid title={`TV Series from ${year}`} items={tv} />}
             </>

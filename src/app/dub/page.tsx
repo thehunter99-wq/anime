@@ -9,7 +9,6 @@ import Header from '@/components/header';
 import MovieGrid from '@/components/movie-grid';
 import TvGrid from '@/components/tv-grid';
 import DetailJsonLd from '@/components/detail-json-ld';
-import { AdBanner } from '@/components/ads';
 import SmartlinkCta from '@/components/smartlink-cta';
 
 /**
@@ -122,7 +121,6 @@ export default async function DubHubPage() {
 {movies.length > 0 && (
              <MovieGrid title={`Popular ${featured.label} Dubbed Movies`} items={movies} />
            )}
-           <AdBanner />
            <SmartlinkCta label={`Fast HD Download — ${featured.label} Dubbed`} hint="Sponsored offer" />
            {tv.length > 0 && (
 <TvGrid title={`Popular ${featured.label} Dubbed Web Series`} items={tv} />
