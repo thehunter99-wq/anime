@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { NATIVE_BANNER_CONTAINER_ID, NATIVE_BANNER_URL } from '@/config/ads';
+import { NATIVE_BANNER_CONTAINER_ID, NATIVE_BANNER_URL, AD_RESERVED_HEIGHT } from '@/config/ads';
 
 export function NativeBannerAd({
   className,
@@ -11,11 +11,17 @@ export function NativeBannerAd({
   className?: string;
   label?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (!NATIVE_BANNER_CONTAINER_ID) return null;
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     const container = containerRef.current;
     if (!container) return;
     if (document.getElementById('adsterra-native-banner-script')) return;
@@ -25,7 +31,17 @@ export function NativeBannerAd({
     script.src = NATIVE_BANNER_URL;
     script.async = true;
     container.appendChild(script);
-  }, []);
+  }, [mounted]);
+
+  if (!mounted) {
+    return (
+      <div
+        className={`w-full min-h-[90px] ${className ?? ''}`}
+        data-ad-slot="native-banner"
+        aria-label={label}
+      />
+    );
+  }
 
   return (
     <div

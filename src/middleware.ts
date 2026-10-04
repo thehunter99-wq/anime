@@ -208,7 +208,7 @@ function buildCSP(request: NextRequest): string {
     // <script>, was silently blocked by exactly this, and rendered nothing while
     // the dashboard reported the zone as active. Ad config now travels in the
     // script URL plus a DOM container id, so no inline script is involved.
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' ${AD_SCRIPT_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' https: ${AD_SCRIPT_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     // data: is required — Adsterra creatives are frequently inline base64 SVG.
     //
@@ -238,7 +238,7 @@ function buildCSP(request: NextRequest): string {
     // narrow.
     //
     // `http:` is deliberately NOT allowed, so plaintext requests stay blocked.
-    `connect-src 'self' ${AD_SCRIPT_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com https://*.google-analytics.com`,
+    `connect-src 'self' https: ${AD_SCRIPT_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com https://*.google-analytics.com`,
     // Ad units render their creative inside an iframe on the network's domain.
     // Framed creatives can be served from a rotated delivery host, so `https:`
     // is allowed here — a frame is inert data and cannot exfiltrate by itself.

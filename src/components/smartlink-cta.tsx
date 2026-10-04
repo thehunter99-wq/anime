@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { SMARTLINK_URL } from '@/config/ads';
 import { cn } from '@/lib/utils';
@@ -14,11 +14,17 @@ export type SmartlinkCtaProps = {
 };
 
 export function SmartlinkCta({ className }: SmartlinkCtaProps) {
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (!SMARTLINK_URL) return null;
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     const container = containerRef.current;
     if (!container) return;
     if (document.getElementById('adsterra-smartlink-script')) return;
@@ -28,7 +34,11 @@ export function SmartlinkCta({ className }: SmartlinkCtaProps) {
     script.src = SMARTLINK_URL;
     script.async = true;
     container.appendChild(script);
-  }, []);
+  }, [mounted]);
+
+  if (!mounted) {
+    return <div className={cn('w-full min-h-[90px]', className ?? '')} data-ad-slot="smartlink" aria-label="Sponsored offer" />;
+  }
 
   return (
     <div
