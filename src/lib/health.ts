@@ -90,9 +90,9 @@ export async function checkTMDBKey(): Promise<CheckResult> {
     return {
       id: 'tmdb-key',
       label: 'TMDB API Key',
-      detail: 'NEXT_PUBLIC_TMDB_API_KEY is not set',
+      detail: 'NEXT_PUBLIC_TMDB_API_KEY is not set or is empty',
       status: 'error',
-      hint: 'Add the key to .env.local and restart the dev server.',
+      hint: 'Get a free key from https://www.themoviedb.org/settings/api, then add it to .env.local as NEXT_PUBLIC_TMDB_API_KEY and restart the dev server.',
     };
   }
 

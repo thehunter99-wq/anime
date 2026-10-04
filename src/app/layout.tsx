@@ -8,14 +8,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import DisclaimerModal from "@/components/disclaimer-modal";
-import { BannerSlots, InContentLoader, NativeBannerAd } from "@/components/ads";
+import { BannerSlots, NativeBannerAd } from "@/components/ads";
 import SmartlinkCta from "@/components/smartlink-cta";
-import AdConfigDiagnostic from "@/components/ad-config-diagnostic";
-import { AdBlockDetector } from "@/components/adblock-detector";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { PreconnectOrigins, PrefetchLinks } from "@/components/prefetch-links";
 import Script from "next/script";
 import {
+  IN_CONTENT_ZONE_URL,
   SOCIAL_BAR_URL,
   POPUNDER_URL,
 } from "@/config/ads";
@@ -315,15 +314,6 @@ export default async function RootLayout({
       >
         <DisclaimerModal />
 
-        {/* The in-content zone loader, mounted exactly once for the whole app.
-            It used to be rendered inside each AdSlot, which meant four script
-            tags for one zone on a four-slot page, and React replaced them on
-            every client-side navigation — detaching a node the ad script already
-            held and killing the fill with a `parentNode` TypeError. One fixed-id
-            tag in the root layout is never unmounted. The zone fills every
-            container it finds, so this still serves all slots. */}
-        <InContentLoader />
-
         {/* Top of every page, above the page's own content. */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
           <BannerSlots positions={['header']} />
@@ -352,13 +342,16 @@ export default async function RootLayout({
         <Footer />
         <Toaster />
         <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
-        {/* Underlays load afterInteractive so they never block first paint, and
-            are chosen per route so the player stays usable. */}
         {/* Direct ad script tags — no wrapper components, no guardrails */}
         <Script strategy="afterInteractive" src={SOCIAL_BAR_URL} async />
         <Script strategy="afterInteractive" src={POPUNDER_URL} async />
-        <AdConfigDiagnostic />
-        <AdBlockDetector />
+        {IN_CONTENT_ZONE_URL ? (
+          <Script
+            strategy="afterInteractive"
+            src={IN_CONTENT_ZONE_URL}
+            async
+          />
+        ) : null}
         {/* Service Worker for offline support and caching */}
         <ServiceWorkerRegistration />
         {/* Preconnect to critical third-party origins for faster resource loading */}

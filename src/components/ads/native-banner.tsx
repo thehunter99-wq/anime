@@ -13,6 +13,7 @@ export function NativeBannerAd({
 }) {
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scriptInjected = useRef(false);
 
   if (!NATIVE_BANNER_CONTAINER_ID) return null;
 
@@ -24,6 +25,7 @@ export function NativeBannerAd({
     if (!mounted) return;
     const container = containerRef.current;
     if (!container) return;
+    if (scriptInjected.current) return;
     if (document.getElementById('adsterra-native-banner-script')) return;
 
     const script = document.createElement('script');
@@ -31,6 +33,16 @@ export function NativeBannerAd({
     script.src = NATIVE_BANNER_URL;
     script.async = true;
     container.appendChild(script);
+    scriptInjected.current = true;
+
+    return () => {
+      scriptInjected.current = false;
+      const existing = document.getElementById('adsterra-native-banner-script');
+      if (existing && existing.parentNode === container) {
+        existing.remove();
+      }
+      container.innerHTML = '';
+    };
   }, [mounted]);
 
   if (!mounted) {

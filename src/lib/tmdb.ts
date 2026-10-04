@@ -14,7 +14,7 @@ function warnMissingKey() {
   if (hasWarned) return;
   hasWarned = true;
   console.warn(
-    '[TMDB] NEXT_PUBLIC_TMDB_API_KEY is missing. Add it to .env.local (restart dev server) to enable movie/TV data.'
+    '[TMDB] NEXT_PUBLIC_TMDB_API_KEY is missing or empty. Add a valid TMDB API key to .env.local and restart the dev server. Until then, all TMDB-dependent rails (movies, TV, anime, search) will return empty results.'
   );
 }
 
