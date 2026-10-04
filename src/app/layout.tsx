@@ -42,6 +42,9 @@ const SITE_TITLE = `${SITE_NAME} - ${SITE_TAGLINE}`;
  * Fallback share image for routes that do not provide their own artwork
  * (homepage, Indian rails, static pages). Media view pages override this via
  * buildMediaMetadata with a real 1280x720 poster.
+ *
+ * `og-default.png` exists in `public/`; `logo.png` never did, so referencing it
+ * was a guaranteed 404 on every page and in every crawler fetch of the JSON-LD.
  */
 const DEFAULT_OG_IMAGE = {
   url: `${SITE_URL}/og-default.png`,
@@ -87,7 +90,7 @@ const WEBSITE_SCHEMA = {
     name: SITE_NAME,
     logo: {
       "@type": "ImageObject",
-      url: `${SITE_URL}/logo.png`,
+      url: `${SITE_URL}/og-default.png`,
     },
     sameAs: [
       "https://github.com/parthakashyap",
@@ -107,7 +110,8 @@ export const metadata: Metadata = {
    * No `icons` override: `src/app/favicon.ico` is the file-based convention
    * and Next.js serves it automatically. Pointing `icons` at `/logo.png` was
    * tried and removed because that file does not exist, which would have shipped
-   * a second, permanently-404ing icon link next to the real one.
+   * a second, permanently-404ing icon link next to the real one. The same reason
+   * applies to the JSON-LD below, which uses og-default.png instead.
    */
   openGraph: {
     type: "website",
@@ -170,7 +174,7 @@ export const metadata: Metadata = {
         "@type": "Organization",
         name: SITE_NAME,
         url: SITE_URL,
-        logo: `${SITE_URL}/logo.png`,
+        logo: `${SITE_URL}/og-default.png`,
         sameAs: [
           "https://github.com/parthakashyap",
           "https://linkedin.com/in/partha-pratim-kashyap",

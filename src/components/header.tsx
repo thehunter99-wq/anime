@@ -12,7 +12,7 @@ import { Button } from './ui/button';
 import { Menu, Sun, Moon, Globe, User, Download, Settings, ChevronDown, Bell, Shield, Play, Film, Tv, BookOpen, Search, Zap } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -336,7 +336,9 @@ function UserMenu() {
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-foreground hover:bg-accent" aria-label="User Menu">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src="/logo.png" alt={SITE_NAME} />
+                  {/* No <AvatarImage src="/logo.png">: that file was never
+                      committed, so it 404'd on every page load. AvatarFallback
+                      below renders the icon immediately with no extra request. */}
                   <AvatarFallback className="bg-gradient-to-r from-sky-500 to-indigo-600 text-white">
                     <User className="h-5 w-5" />
                   </AvatarFallback>

@@ -126,6 +126,37 @@ const AD_HOSTS = [
 ] as const;
 
 /**
+ * Hosts that serve AD DELIVERY traffic — creative JSON and impression pixels —
+ * as opposed to the zone scripts themselves.
+ *
+ * ── Why this list exists ──────────────────────────────────────────────────────
+ * The zone script is served from `*.profitableratecpmnetwork.com`, but once it
+ * runs it fetches its creative from a *different* domain and beacons the
+ * impression to another. Those are separate hosts and the original policy only
+ * listed the zone hosts, so every request after "script loaded" was blocked:
+ *
+ *   Connecting to 'https://consumeririssalary.com/ntv.json' violates connect-src
+ *   Loading image 'https://consumeririssalary.com/pixel/nvrwe' violates img-src
+ *
+ * Verified against the live zones rather than assumed: the native banner payload
+ * (pl31625878/89898e7a…/invoke.js) genuinely references `consumeririssalary`, and
+ * `https://consumeririssalary.com/pixel/nvrwe` returns HTTP 200. Without this the
+ * slot renders an empty frame and records no impression, which pays nothing.
+ *
+ * `highperformanceformat` and `highcpmgate` are included because they are
+ * Adsterra's own delivery infrastructure and rotate in as alternate creative
+ * hosts; both resolve. They are listed in `connect-src`/`img-src` only — never in
+ * `script-src` — so they cannot introduce script execution. Keeping script
+ * loading on the narrower, verified zone hosts is deliberate.
+ */
+const AD_DELIVERY_HOSTS = [
+  'https://consumeririssalary.com',
+  'https://*.consumeririssalary.com',
+  'https://*.highperformanceformat.com',
+  'https://*.highcpmgate.com',
+] as const;
+
+/**
  * Hosts allowed to SERVE ad scripts.
  *
  * `ssat.pro` was removed deliberately. It is the host the Adsterra in-content
@@ -162,13 +193,14 @@ function buildCSP(request: NextRequest): string {
     `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}' 'strict-dynamic' ${AD_SCRIPT_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     // data: is required — Adsterra creatives are frequently inline base64 SVG.
-    `img-src 'self' data: blob: https://image.tmdb.org https://s4.anilist.co https://placehold.co https://images.unsplash.com https://picsum.photos ${AD_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
+    `img-src 'self' data: blob: https://image.tmdb.org https://s4.anilist.co https://placehold.co https://images.unsplash.com https://picsum.photos ${AD_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://www.googletagmanager.com https://www.google-analytics.com`,
     "font-src 'self' data: https://fonts.gstatic.com",
     // Ad units beacon back to their own network after rendering; without these
-    // the impression is never recorded.
-    `connect-src 'self' ${AD_SCRIPT_HOSTS.join(' ')} https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com https://*.google-analytics.com`,
+    // the impression is never recorded. AD_DELIVERY_HOSTS is what makes the
+    // creative fetch and the pixel beacon succeed — see its comment.
+    `connect-src 'self' ${AD_SCRIPT_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://api.themoviedb.org https://graphql.anilist.co https://api.indexnow.org https://www.bing.com https://searchadvisor.naver.com https://webmaster.yandex.com https://www.google-analytics.com https://region1.google-analytics.com https://*.google-analytics.com`,
     // Ad units render their creative inside an iframe on the network's domain.
-    `frame-src 'self' ${AD_HOSTS.join(' ')} https://vidsrc.pm https://vidlink.pro https://www.2embed.cc https://vidsrc.sbs https://autoembed.co`,
+    `frame-src 'self' ${AD_HOSTS.join(' ')} ${AD_DELIVERY_HOSTS.join(' ')} https://vidsrc.pm https://vidlink.pro https://www.2embed.cc https://vidsrc.sbs https://autoembed.co`,
     "object-src 'none'",
     "base-uri 'self'",
     // Some Adsterra units post a form to their lander. 'self' alone blocked them.
