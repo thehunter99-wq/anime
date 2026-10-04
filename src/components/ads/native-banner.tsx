@@ -65,25 +65,44 @@ export function NativeBannerAd({
     <>
       <AdFrame label={label} heightClass={AD_RESERVED_HEIGHT.native} className={className}>
         {!filled && <AdSkeleton className={AD_RESERVED_HEIGHT.native} label={label} />}
+        {/*
+          The zone loader locates this container by walking up from
+          `document.currentScript` to `parentNode`, then inserting the creative
+          there. The loader payload was verified to contain both
+          `document.currentScript` and `parentNode`, which makes TWO rules
+          non-negotiable:
+
+            1. The script element must stay inside this same subtree. An earlier
+               version rendered it as a sibling of <AdFrame> in the root layout,
+               so the walk-up from the script landed on <body> — an element the
+               loader then filled instead of the container, or failed to find.
+            2. It must be a DOM sibling of the container div, not a child of it.
+               A child would be wiped when the loader replaces the container's
+               contents, and `currentScript` would be null on the second run.
+
+          Both hold here: the script is the next sibling of the container, inside
+          the frame. The container keeps its fixed id, so nothing that hydrates can
+          move or detach it.
+        */}
         <div
           id={NATIVE_BANNER_CONTAINER_ID}
           className="w-full"
           suppressHydrationWarning
         />
-      </AdFrame>
 
-      <Script
-        id="adsterra-native-banner"
-        src={NATIVE_BANNER_URL}
-        strategy="lazyOnload"
-        async
-        onError={() =>
-          console.error(
-            `[adsterra] native banner failed to load from ${NATIVE_BANNER_URL}. ` +
-              'Check the zone is active and that CSP script-src allows *.profitableratecpmnetwork.com.'
-          )
-        }
-      />
+        <Script
+          id="adsterra-native-banner"
+          src={NATIVE_BANNER_URL}
+          strategy="lazyOnload"
+          async
+          onError={() =>
+            console.error(
+              `[adsterra] native banner failed to load from ${NATIVE_BANNER_URL}. ` +
+                'Check the zone is active and that CSP script-src allows *.profitableratecpmnetwork.com.'
+            )
+          }
+        />
+      </AdFrame>
     </>
   );
 }

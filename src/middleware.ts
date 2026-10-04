@@ -81,6 +81,11 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   
   // Permissions policy - disable dangerous features
+  //
+  // `interest-cohort=()` was removed. The FLoC feature it targeted was retired
+  // in Chrome, so the directive is unknown to current browsers and produces a
+  // console warning on every page load. Unknown directives are ignored, so
+  // dropping it changes no behaviour.
   'Permissions-Policy': [
     'accelerometer=()',
     'camera=()',
@@ -90,7 +95,6 @@ const SECURITY_HEADERS = {
     'microphone=()',
     'payment=()',
     'usb=()',
-    'interest-cohort=()',
   ].join(', '),
   
   // Cross-Origin policies
@@ -150,13 +154,22 @@ const AD_HOSTS = [
  * loading on the narrower, verified zone hosts is deliberate.
  */
 const AD_DELIVERY_HOSTS = [
+  // Every apex observed so far, newest last. Adsterra rotates these every few
+  // hours to defeat domain-based blocking: consumeririssalary.com ->
+  // kettledroopingcontinuation.com -> exemplarfederallithe.com. All three share
+  // the 172.240.x netblocks, and the newest is NOT present in the zone payloads
+  // at all — it is fetched from Adsterra's API at runtime, which is why a purely
+  // static allowlist keeps breaking.
+  //
+  // Listed for immediate correctness. `img-src`/`frame-src` additionally allow
+  // `https:` so the NEXT rotation needs no redeploy; `connect-src` deliberately
+  // does not (see the directive for why). Add new apexes here as they appear.
   'https://consumeririssalary.com',
   'https://*.consumeririssalary.com',
-  // Confirmed in the live popunder and social-bar payloads after the first
-  // rotation; listed explicitly so it works immediately rather than waiting on
-  // an `*.adsterra.com` fetch.
   'https://kettledroopingcontinuation.com',
   'https://*.kettledroopingcontinuation.com',
+  'https://exemplarfederallithe.com',
+  'https://*.exemplarfederallithe.com',
   'https://*.highperformanceformat.com',
   'https://*.highcpmgate.com',
 ] as const;
